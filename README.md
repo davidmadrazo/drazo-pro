@@ -56,6 +56,7 @@ irm https://raw.githubusercontent.com/davidmadrazo/drazo-pro/main/instalar.ps1 -
 
 - Claude Code, Node.js, Git, Google Chrome y ffmpeg (la versión completa).
 - Python con un entorno propio de Drazo, que no toca tus otros programas.
+- El modelo de transcripción (large-v3-turbo, unos 1,6 GB), para que la primera transcripción no tarde ni se corte.
 - HyperFrames, el motor con el que se montan los vídeos (su navegador y sus skills públicas).
 - Las fuentes libres de las plantillas: Anton, Caveat, Poppins, Inter y JetBrains Mono (de Google Fonts, licencia OFL).
 - Opcional: Tesseract, de Mirage. Si lo instalas, aceptas sus condiciones de uso.

@@ -268,6 +268,21 @@ function Comprobar-Entorno {
     Nuevo-Resultado 'venv' $nombre 'ok' "Python $version · $($bien -join ', ')"
 }
 
+# El motor de transcribir usa este modelo de la caché de Hugging Face; si no está, lo baja la primera
+# vez dentro de una orden con límite de 10 minutos. Una descarga a medias deja la carpeta sin model.bin.
+function Comprobar-Modelo {
+    $nombre = 'Modelo de transcripción large-v3-turbo'
+    if (-not (Test-Path -LiteralPath $DrazoPython)) { return Nuevo-Resultado 'modelo' $nombre 'falta' 'no se puede mirar sin el entorno de Python de Drazo' 'Lo descarga el instalador de Drazo después de crear el entorno (unos 1,6 GB).' }
+    $r = Ejecutar $DrazoPython @('-X', 'utf8', '-c', "import os; from faster_whisper import download_model; p = download_model('large-v3-turbo', local_files_only=True); print(os.path.getsize(os.path.join(p, 'model.bin')))")
+    $bytes = [long]0
+    if ($r.Codigo -eq 0) {
+        foreach ($linea in $r.Lineas) { $n = [long]0; if ([long]::TryParse($linea.Trim(), [ref]$n)) { $bytes = $n } }
+    }
+    if ($bytes -gt 1GB) { return Nuevo-Resultado 'modelo' $nombre 'ok' ("descargado ({0:N1} GB, caché de Hugging Face)" -f ($bytes / 1e9)) }
+    if ($r.Texto -match 'No module named|ImportError') { return Nuevo-Resultado 'modelo' $nombre 'falta' 'faster-whisper no está en el entorno de Drazo' 'Vuelve a ejecutar el instalador de Drazo: rehace el entorno y descarga el modelo.' }
+    Nuevo-Resultado 'modelo' $nombre 'falta' 'no está descargado' 'Vuelve a ejecutar el instalador de Drazo y acepta descargarlo (unos 1,6 GB): si no, la primera transcripción lo baja y puede cortarse.'
+}
+
 function Comprobar-Playwright {
     $nombre = 'playwright-core de Drazo'
     $pj = Join-Path $DrazoNode 'node_modules\playwright-core\package.json'
@@ -402,7 +417,7 @@ function Ejecutar-Comprobacion([string]$Funcion) {
 # Orden de comprobación = orden de instalación.
 $ComprobacionesDrazo = @(
     'Comprobar-Sistema', 'Comprobar-Winget', 'Comprobar-Git', 'Comprobar-Node', 'Comprobar-Claude', 'Comprobar-Cuenta',
-    'Comprobar-Ffmpeg', 'Comprobar-Python', 'Comprobar-Entorno', 'Comprobar-Playwright', 'Comprobar-Chrome',
+    'Comprobar-Ffmpeg', 'Comprobar-Python', 'Comprobar-Entorno', 'Comprobar-Modelo', 'Comprobar-Playwright', 'Comprobar-Chrome',
     'Comprobar-NavegadorHF', 'Comprobar-SkillsHF', 'Comprobar-Fuentes', 'Comprobar-Telemetria', 'Comprobar-Tesseract',
     'Comprobar-Licencia', 'Comprobar-Bash', 'Comprobar-Plugin', 'Comprobar-Disco', 'Comprobar-Memoria'
 )

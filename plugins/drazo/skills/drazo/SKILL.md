@@ -36,13 +36,15 @@ En cualquier momento el usuario puede pedir «rehaz mi onboarding» (`drazo_onbo
 - **Licencia**: si una herramienta responde con un problema de licencia («licencia inactiva», clave no válida o similar), díselo al usuario tal cual, con las mismas palabras, y para. Sin licencia no se edita.
 - **Los vídeos no salen de este ordenador**: la transcripción y el render se hacen aquí. Nunca subas vídeos ni audio a ninguna herramienta ni servicio; al servidor solo va el texto que pida cada herramienta.
 - **No toques los originales**: nunca borres ni sobrescribas los brutos del usuario.
-- **El usuario no es técnico**: cuéntale en una frase qué vas haciendo, sin rutas ni comandos salvo que los pida.
+- **Idioma**: habla siempre en el idioma del usuario (en español si te escribe en español), también en los mensajes cortos entre una herramienta y otra: «Instalando los motores…», nunca «Installing the motors…».
+- **El usuario no es técnico**: cuéntale en una frase qué vas haciendo, sin jerga, rutas ni comandos salvo que los pida.
 
 ## En este ordenador
 
 | Qué | Windows | macOS |
 |---|---|---|
 | Python de Drazo (faster-whisper, numpy, scipy, soundfile, opencv, fonttools, librosa, Pillow) | `%LOCALAPPDATA%\Drazo\venv\Scripts\python.exe` | `~/.local/share/drazo/venv/bin/python` |
+| Modelo de transcripción large-v3-turbo de faster-whisper, ya descargado | caché de Hugging Face (`%USERPROFILE%\.cache\huggingface\hub`) | caché de Hugging Face (`~/.cache/huggingface/hub`) |
 | playwright-core (usa el Google Chrome instalado, no trae navegador) | `%LOCALAPPDATA%\Drazo\node\node_modules` | `~/.local/share/drazo/node/node_modules` |
 | Tesseract, si está instalado | `%LOCALAPPDATA%\Tesseract\bin\tsrct.cmd` | `~/Library/Application Support/Tesseract/bin/tsrct` |
 | Fuentes Anton, Caveat, Poppins, Inter y JetBrains Mono | `%LOCALAPPDATA%\Microsoft\Windows\Fonts` | `~/Library/Fonts` |

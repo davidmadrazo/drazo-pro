@@ -160,6 +160,12 @@ instalar_venv() {
     "$DRAZO_PYTHON" -m pip install --disable-pip-version-check -r "$REQUISITOS_PYTHON"
 }
 
+instalar_modelo() {
+    if [ ! -x "$DRAZO_PYTHON" ]; then echo "${C_ROJO}Falta el entorno de Python de Drazo: no puedo descargar el modelo.${C_FIN}"; return 1; fi
+    echo "Descargando el modelo de transcripción large-v3-turbo (unos 1,6 GB; tarda según tu conexión)..."
+    "$DRAZO_PYTHON" -c "from faster_whisper import download_model; download_model('large-v3-turbo')"
+}
+
 instalar_playwright() {
     requiere_node || return 1
     mkdir -p "$DRAZO_NODE"
@@ -275,6 +281,7 @@ texto_accion() {
         ffmpeg) echo "Instalo ffmpeg-full (con libx264 y zscale)" ;;
         python) echo "Instalo Python 3.12" ;;
         venv) echo "Creo el entorno de Python de Drazo (unos 1-2 GB en $DRAZO_VENV)" ;;
+        modelo) echo "Descargo el modelo de transcripción large-v3-turbo (unos 1,6 GB), para que la primera transcripción no se corte" ;;
         playwright) echo "Instalo playwright-core solo para Drazo (en $DRAZO_NODE)" ;;
         chrome) echo "Instalo Google Chrome" ;;
         navegador) echo "Descargo el navegador de HyperFrames" ;;

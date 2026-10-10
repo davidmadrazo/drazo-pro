@@ -19,7 +19,7 @@ SKILLS_TESSERACT="tesseract-video tesseract-motion"
 ID_PLUGIN="drazo@drazo"
 NODE_MINIMO=22
 DISCO_MINIMO_GB=10
-COMPROBACIONES_DRAZO="sistema brew git node claude cuenta ffmpeg python venv playwright chrome navegador skills fuentes telemetria tesseract licencia bash plugin disco memoria"
+COMPROBACIONES_DRAZO="sistema brew git node claude cuenta ffmpeg python venv modelo playwright chrome navegador skills fuentes telemetria tesseract licencia bash plugin disco memoria"
 
 if [ -t 1 ]; then
     C_VERDE=$'\033[32m'; C_ROJO=$'\033[31m'; C_AMARILLO=$'\033[33m'; C_CIAN=$'\033[36m'; C_FIN=$'\033[0m'
@@ -301,6 +301,22 @@ comprobar_venv() {
     bien="$(printf '%s\n' "$salida" | awk '$1 == "OK" { printf "%s%s %s", s, $2, $3; s = ", " }')"
     if [ -n "$mal" ]; then resultado venv "$nombre" falta "Python $version; fallan: $mal" "Vuelve a ejecutar el instalador de Drazo: reinstala los paquetes."; return; fi
     resultado venv "$nombre" ok "Python $version · $bien"
+}
+
+# El motor de transcribir usa este modelo de la caché de Hugging Face; si no está, lo baja la primera
+# vez dentro de una orden con límite de 10 minutos. Una descarga a medias deja la carpeta sin model.bin.
+comprobar_modelo() {
+    local nombre="Modelo de transcripción large-v3-turbo" salida bytes
+    if [ ! -x "$DRAZO_PYTHON" ]; then resultado modelo "$nombre" falta "no se puede mirar sin el entorno de Python de Drazo" "Lo descarga el instalador de Drazo después de crear el entorno (unos 1,6 GB)."; return; fi
+    salida="$("$DRAZO_PYTHON" -X utf8 -c "import os; from faster_whisper import download_model; p = download_model('large-v3-turbo', local_files_only=True); print(os.path.getsize(os.path.join(p, 'model.bin')))" 2>&1)"
+    bytes="$(printf '%s\n' "$salida" | grep -E '^[0-9]+$' | tail -n 1)"
+    if [ -n "$bytes" ] && [ "$bytes" -gt 1073741824 ]; then
+        resultado modelo "$nombre" ok "descargado ($(awk -v b="$bytes" 'BEGIN { printf "%.1f", b / 1000000000 }') GB, caché de Hugging Face)"; return
+    fi
+    case "$salida" in
+        *"No module named"*|*ImportError*) resultado modelo "$nombre" falta "faster-whisper no está en el entorno de Drazo" "Vuelve a ejecutar el instalador de Drazo: rehace el entorno y descarga el modelo."; return ;;
+    esac
+    resultado modelo "$nombre" falta "no está descargado" "Vuelve a ejecutar el instalador de Drazo y acepta descargarlo (unos 1,6 GB): si no, la primera transcripción lo baja y puede cortarse."
 }
 
 comprobar_playwright() {

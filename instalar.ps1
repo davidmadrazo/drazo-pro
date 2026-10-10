@@ -88,6 +88,13 @@ function Instalar-Entorno {
     & $DrazoPython -m pip install --disable-pip-version-check -r $RequisitosPython
 }
 
+function Descargar-Modelo {
+    if (-not (Test-Path -LiteralPath $DrazoPython)) { Write-Host 'Falta el entorno de Python de Drazo: no puedo descargar el modelo.' -ForegroundColor Red; return }
+    Write-Host 'Descargando el modelo de transcripción large-v3-turbo (unos 1,6 GB; tarda según tu conexión)...'
+    $env:HF_HUB_DISABLE_SYMLINKS_WARNING = '1'
+    & $DrazoPython -c "from faster_whisper import download_model; download_model('large-v3-turbo')"
+}
+
 function Instalar-Playwright {
     if (-not (Buscar-Comando 'npm.cmd')) { Write-Host 'Falta Node.js: no puedo instalar playwright-core.' -ForegroundColor Red; return }
     New-Item -ItemType Directory -Force $DrazoNode | Out-Null
@@ -214,6 +221,7 @@ function Principal {
         ffmpeg     = @{ Texto = 'Instalo ffmpeg completo (con libx264 y zscale)'; Hacer = { Instalar-ConWinget 'Gyan.FFmpeg' 'ffmpeg' } }
         python     = @{ Texto = 'Instalo Python 3.12'; Hacer = { Instalar-ConWinget 'Python.Python.3.12' 'Python 3.12' } }
         venv       = @{ Texto = "Creo el entorno de Python de Drazo (unos 1-2 GB en $DrazoVenv)"; Hacer = { Instalar-Entorno } }
+        modelo     = @{ Texto = 'Descargo el modelo de transcripción large-v3-turbo (unos 1,6 GB), para que la primera transcripción no se corte'; Hacer = { Descargar-Modelo } }
         playwright = @{ Texto = "Instalo playwright-core solo para Drazo (en $DrazoNode)"; Hacer = { Instalar-Playwright } }
         chrome     = @{ Texto = 'Instalo Google Chrome'; Hacer = { Instalar-ConWinget 'Google.Chrome' 'Google Chrome' } }
         navegador  = @{ Texto = 'Descargo el navegador de HyperFrames'; Hacer = { Instalar-NavegadorHF } }
