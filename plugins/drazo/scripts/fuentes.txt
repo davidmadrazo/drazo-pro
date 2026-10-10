@@ -1,0 +1,14 @@
+# Fuentes libres (licencia OFL) del repositorio oficial de Google Fonts, fijadas a un commit y con su SHA-256.
+# Origen: https://raw.githubusercontent.com/google/fonts/<commit>/<ruta>
+# familia|ruta en google/fonts|nombre del fichero instalado|nombre para el registro de Windows|sha256
+commit|bd8f81ddb5c74d5c8897b36ad88b440266245103
+Anton|ofl/anton/Anton-Regular.ttf|Anton-Regular.ttf|Anton Regular|a4ba3a92350ebb031da0cb47630ac49eb265082ca1bc0450442f4a83ab947cab
+Caveat|ofl/caveat/Caveat%5Bwght%5D.ttf|Caveat-Variable.ttf|Caveat|0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988
+Poppins|ofl/poppins/Poppins-Regular.ttf|Poppins-Regular.ttf|Poppins Regular|7e65201e9b79159e2300267cc885e16c8dcef2424cdfa09a29bfb0980a94a7ba
+Poppins|ofl/poppins/Poppins-Medium.ttf|Poppins-Medium.ttf|Poppins Medium|90373e7d838d32468438fc3e152dca0bdb12edcab99ea639f158790b1ba1fd05
+Poppins|ofl/poppins/Poppins-SemiBold.ttf|Poppins-SemiBold.ttf|Poppins SemiBold|d3bf1bdaf0550e83da9ac0b1d1d9fe6db086835a83aa28578e609a394b9a0286
+Poppins|ofl/poppins/Poppins-Bold.ttf|Poppins-Bold.ttf|Poppins Bold|983676516167748b74de6f4771fb384c664fd913acb8b471122ecacf5da5ea6c
+Poppins|ofl/poppins/Poppins-ExtraBold.ttf|Poppins-ExtraBold.ttf|Poppins ExtraBold|f2ab17c1a63a0ecc12c2461848fc8a469395e3cd2d641803e889c643d9f958e1
+Poppins|ofl/poppins/Poppins-Black.ttf|Poppins-Black.ttf|Poppins Black|d82aaaf98a9283f9a8edd24e51173337d8eaf09e25cd3d98831f8ec8461748a1
+Inter|ofl/inter/Inter%5Bopsz,wght%5D.ttf|Inter-Variable.ttf|Inter|29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031
+JetBrains Mono|ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf|JetBrainsMono-Variable.ttf|JetBrains Mono|48715a42ec242c21e9f02692891e147d022299a52e48d5e413e1a942193ffeda

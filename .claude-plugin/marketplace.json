@@ -1,0 +1,19 @@
+{
+  "name": "drazo",
+  "description": "Drazo Pro: edita tus vídeos con Claude Code y el método de Drazo (ProfimaxIA).",
+  "owner": {
+    "name": "ProfimaxIA",
+    "email": "davidmadrazo@profimaxia.com",
+    "url": "https://profimaxia.com"
+  },
+  "plugins": [
+    {
+      "name": "drazo",
+      "source": "./plugins/drazo",
+      "repository": "https://github.com/davidmadrazo/drazo-pro",
+      "description": "Editor de vídeo Drazo Pro: dile a Claude «edítame el vídeo» y lo monta en tu ordenador siguiendo el método de Drazo. Necesita tu clave de licencia.",
+      "category": "video",
+      "tags": ["video", "edicion", "reels"]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "drazo": {
+      "type": "http",
+      "url": "https://drazo.vercel.app/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${DRAZO_LICENCIA}"
+      },
+      "timeout": 300000
+    }
+  }
+}

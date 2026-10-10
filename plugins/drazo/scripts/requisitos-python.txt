@@ -1,0 +1,9 @@
+# Paquetes del entorno de Python de Drazo (venv propio en la carpeta de datos de Drazo).
+faster-whisper
+numpy
+scipy
+soundfile
+opencv-python-headless
+fonttools
+librosa
+Pillow
