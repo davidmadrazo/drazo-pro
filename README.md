@@ -5,13 +5,13 @@ Drazo Pro edita tus vídeos dentro de Claude, en tu propio ordenador. Le dices �
 ## Qué necesitas
 
 - Un ordenador con **Windows 10 u 11** (64 bits) o un **Mac con macOS 13** o superior.
-- Una suscripción a **Claude Max 5x o superior**. Con el plan Pro no llega.
+- Una suscripción de pago a Claude: **Max 5x recomendado**. Con Pro también funciona, pero editar un vídeo gasta mucho y puede pausarse hasta que se renueve tu cupo.
 - Tu **clave de licencia de Drazo**. Empieza por `drz_` y te la enviamos al darte de alta.
 - Unos **10 GB libres** en el disco y, mejor, 16 GB de memoria (mínimo 8).
 
 ## Instalar sin tocar la terminal
 
-1. Descarga la **app de escritorio de Claude** desde [claude.com/download](https://claude.com/download), instálala como cualquier programa y entra con tu cuenta de Claude Max.
+1. Descarga la **app de escritorio de Claude** desde [claude.com/download](https://claude.com/download), instálala como cualquier programa y entra con tu cuenta de Claude.
 2. En la app, abre la pestaña **Code** y elige una carpeta, por ejemplo una carpeta «Drazo» dentro de Documentos.
 3. Pega este mensaje en el chat, con tu clave al final:
 
