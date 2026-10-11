@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url"
 export const ID_PLUGIN = "drazo@drazo"
 export const MARKETPLACE = "drazo"
 export const REPO = "davidmadrazo/drazo-pro"
+const ESPERA_MCP_MS = 900_000
 
 export const carpetaConfig = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude")
 export const rutaAjustes = () => join(carpetaConfig(), "settings.json")
@@ -55,7 +56,10 @@ export function registrar(a, { licencia, fuenteLocal }) {
     const opciones = esObjeto(actual.options) ? actual.options : {}
     configs[ID_PLUGIN] = { ...actual, options: { ...opciones, licencia } }
   }
-  seccion(a, "env").CLAUDE_CODE_PLUGIN_PREFER_HTTPS = "1"
+  const env = seccion(a, "env")
+  env.CLAUDE_CODE_PLUGIN_PREFER_HTTPS = "1"
+  // La dirección de un vídeo tarda 3-4 min en el servidor (puede llegar a 13): que Claude Code la espere entera
+  if (!(Number(env.MCP_TOOL_TIMEOUT) >= ESPERA_MCP_MS)) env.MCP_TOOL_TIMEOUT = String(ESPERA_MCP_MS)
   return a
 }
 
@@ -102,6 +106,7 @@ export function estado() {
     licencia_formato: clave.startsWith("drz_") ? "si" : "no",
     telemetria: a.env?.HYPERFRAMES_NO_TELEMETRY === "1" ? "si" : "no",
     https: a.env?.CLAUDE_CODE_PLUGIN_PREFER_HTTPS === "1" ? "si" : "no",
+    espera_mcp: Number(a.env?.MCP_TOOL_TIMEOUT) >= ESPERA_MCP_MS ? "si" : "no",
     descargado: registro || mercado?.source === "directory" ? "si" : "no",
     version: registro?.version || "",
   }
