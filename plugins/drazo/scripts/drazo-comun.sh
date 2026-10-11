@@ -1,14 +1,33 @@
 # Comprobaciones de Drazo Pro en macOS, compartidas por el instalador y el doctor.
 # Se carga con: . "<carpeta>/drazo-comun.sh"
 # Compatible con el bash 3.2 de macOS: sin arrays asociativos ni ${var,,}.
+# Sin Homebrew ni sudo: todo lo que instala Drazo va en su carpeta (~/.local/share/drazo).
 
 DRAZO_SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DRAZO_DATOS="$HOME/.local/share/drazo"
 DRAZO_VENV="$DRAZO_DATOS/venv"
 DRAZO_PYTHON="$DRAZO_VENV/bin/python"
 DRAZO_NODE="$DRAZO_DATOS/node"
+DRAZO_NODEJS="$DRAZO_DATOS/nodejs"
+DRAZO_FFMPEG="$DRAZO_DATOS/ffmpeg"
+DRAZO_UV="$DRAZO_DATOS/uv"
 DRAZO_ENTORNO="$DRAZO_DATOS/entorno.sh"
+AJUSTES_SCRIPT="$DRAZO_SCRIPTS/ajustes-claude.mjs"
 REQUISITOS_PYTHON="$DRAZO_SCRIPTS/requisitos-python.txt"
+# Node oficial (nodejs.org), uv (astral-sh/uv) y ffmpeg 9.0.2 estático de https://ffmpeg.martin-riedl.de
+# (zips firmados; traen libx264 y zimg para zscale): versiones fijas con su SHA-256.
+VERSION_NODE="24.21.0"
+SHA256_NODE_ARM64="bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057"
+SHA256_NODE_X86_64="1462cb3b3046b815cf8ea436d3da450ec1a9f11dac7e5a46b0ada5305d7e8097"
+VERSION_UV="0.13.0"
+SHA256_UV_ARM64="a9c1b29002cf3c83f07fa9cd8a887a3be0107d90e23189721221e7257db8e3d6"
+SHA256_UV_X86_64="5f44dcbde809b632f47c36fadb241cb4d6f9af71d0c8f172b5d2026d3dde742c"
+URL_FFMPEG_ARM64="https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2"
+URL_FFMPEG_X86_64="https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2"
+SHA256_FFMPEG_ARM64="c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924"
+SHA256_FFPROBE_ARM64="fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6"
+SHA256_FFMPEG_X86_64="7c6b4125b191cbf773832dc51f424cf2b6bb7da43007d1e066f95909e47cacd4"
+SHA256_FFPROBE_X86_64="2322438ed2f6319a691291b247d09c69dcaa3a982460d1f269a7e1af335cfdfd"
 LISTA_FUENTES="$DRAZO_SCRIPTS/fuentes.txt"
 CARPETA_FUENTES="$HOME/Library/Fonts"
 VERSION_TESSERACT="0.2.0"
@@ -19,7 +38,7 @@ SKILLS_TESSERACT="tesseract-video tesseract-motion"
 ID_PLUGIN="drazo@drazo"
 NODE_MINIMO=22
 DISCO_MINIMO_GB=10
-COMPROBACIONES_DRAZO="sistema brew git node claude cuenta ffmpeg python venv modelo playwright chrome navegador skills fuentes telemetria tesseract licencia bash plugin disco memoria"
+COMPROBACIONES_DRAZO="sistema git node claude cuenta ffmpeg python venv modelo playwright chrome navegador skills fuentes telemetria tesseract licencia bash plugin disco memoria"
 
 if [ -t 1 ]; then
     C_VERDE=$'\033[32m'; C_ROJO=$'\033[31m'; C_AMARILLO=$'\033[33m'; C_CIAN=$'\033[36m'; C_FIN=$'\033[0m'
@@ -102,16 +121,43 @@ version_minima() {
 # un diálogo de instalación al ejecutarlos: no se tocan si no están instaladas.
 tiene_clt() { xcode-select -p >/dev/null 2>&1; }
 
-ruta_brew() {
-    if command -v brew >/dev/null 2>&1; then command -v brew; return; fi
-    local b
-    for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do [ -x "$b" ] && { echo "$b"; return; }; done
+# arm64 en Apple Silicon (también bajo Rosetta) y x86_64 en Intel.
+arquitectura() {
+    if [ "$(uname -m)" = "arm64" ] || [ "$(sysctl -in sysctl.proc_translated 2>/dev/null)" = "1" ]; then echo arm64; else echo x86_64; fi
 }
 
-# Deja brew (y lo que instala) en el PATH de este proceso.
-cargar_brew() {
-    local b; b="$(ruta_brew)"
-    [ -n "$b" ] && eval "$("$b" shellenv)"
+# Node, ffmpeg y uv de Drazo en el PATH de este proceso (una terminal nueva los toma de entorno.sh).
+cargar_rutas_drazo() {
+    local d
+    for d in "$DRAZO_FFMPEG" "$DRAZO_NODEJS/bin" "$DRAZO_UV"; do
+        case ":$PATH:" in *":$d:"*) ;; *) [ -d "$d" ] && PATH="$d:$PATH" ;; esac
+    done
+    export PATH
+}
+
+ruta_app_escritorio() {
+    local a
+    for a in "/Applications/Claude.app" "$HOME/Applications/Claude.app"; do
+        if [ -d "$a" ]; then echo "$a"; return; fi
+    done
+}
+
+# Registro de Drazo y licencia en los ajustes de Claude (settings.json), leídos con ajustes-claude.mjs.
+# Quedan en variables AJ_<clave> (bash 3.2 no tiene arrays asociativos).
+AJ_CARGADO=0
+estado_ajustes() {
+    if [ "$AJ_CARGADO" = "1" ] && [ "${1:-}" != "--renovar" ]; then return 0; fi
+    AJ_CARGADO=0
+    command -v node >/dev/null 2>&1 || return 1
+    local linea clave
+    while IFS= read -r linea; do
+        clave="${linea%%=*}"
+        case "$clave" in
+            ajustes|ruta|detalle|marketplace|fuente|activado|licencia|licencia_tapada|licencia_formato|telemetria|https|descargado|version)
+                printf -v "AJ_$clave" '%s' "${linea#*=}" ;;
+        esac
+    done <<< "$(node "$AJUSTES_SCRIPT" estado 2>/dev/null)"
+    AJ_CARGADO=1
 }
 
 carpeta_config_claude() { echo "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"; }
@@ -137,22 +183,13 @@ process.stdin.on("data", (c) => (s += c)).on("end", () => {
 })' "$1" 2>/dev/null
 }
 
-# Valor guardado en el entorno de Drazo (entorno.sh), que carga el perfil de la terminal.
-valor_entorno() {
-    [ -f "$DRAZO_ENTORNO" ] || return 0
-    sed -n "s/^export $1='\(.*\)'\$/\1/p" "$DRAZO_ENTORNO" | tail -n 1
-}
-
-# Python de base para crear el entorno de Drazo (se descartan los de conda).
+# Python de base, solo como reserva si no hay uv (se descartan los de conda).
 PY_BASE_EXE=""; PY_BASE_VERSION=""
 buscar_python_base() {
-    local c exe salida version conda orden mejor_orden=99 brew prefijo=""
+    local c exe salida version conda orden mejor_orden=99
     PY_BASE_EXE=""; PY_BASE_VERSION=""
-    brew="$(ruta_brew)"
-    [ -n "$brew" ] && prefijo="$(dirname "$(dirname "$brew")")"
     for c in python3.12 python3.13 python3.11 python3.14 python3.10 python3; do
         exe="$(command -v "$c" 2>/dev/null)"
-        if [ -z "$exe" ] && [ -n "$prefijo" ] && [ -x "$prefijo/bin/$c" ]; then exe="$prefijo/bin/$c"; fi
         [ -n "$exe" ] || continue
         if [ "$exe" = "/usr/bin/python3" ] && ! tiene_clt; then continue; fi
         salida="$("$exe" -c 'import os,sys; print("%d.%d.%d" % sys.version_info[:3]); print(sys.executable); print(os.path.isdir(os.path.join(sys.prefix, "conda-meta")))' 2>/dev/null)" || continue
@@ -209,42 +246,37 @@ comprobar_sistema() {
     resultado sistema "$nombre" ok "macOS $v ($arq)"
 }
 
-comprobar_brew() {
-    local b; b="$(ruta_brew)"
-    if [ -z "$b" ]; then resultado brew "Homebrew" falta "no está" "Instálalo desde https://brew.sh (el instalador de Drazo lo hace por ti)."; return; fi
-    if ! command -v brew >/dev/null 2>&1; then
-        resultado brew "Homebrew" falta "instalado en $b, pero esta terminal no lo carga" "Vuelve a ejecutar el instalador de Drazo (lo añade al entorno) y abre una terminal nueva."; return
-    fi
-    resultado brew "Homebrew" ok "$(leer_version "$("$b" --version 2>/dev/null | head -n 1)")"
-}
-
 comprobar_git() {
     local g; g="$(command -v git 2>/dev/null)"
     if [ -z "$g" ] || { [ "$g" = "/usr/bin/git" ] && ! tiene_clt; }; then
-        resultado git "Git" falta "no está" "xcode-select --install (o brew install git)"; return
+        resultado git "Git" falta "no está" "Lo instala el instalador de Drazo: abre la ventana de Apple de las herramientas de desarrollo (pulsa «Instalar»)."; return
     fi
     resultado git "Git" ok "$(leer_version "$("$g" --version 2>/dev/null)")"
 }
 
 comprobar_node() {
     local nombre="Node.js 22 o superior" v
-    if ! command -v node >/dev/null 2>&1; then resultado node "$nombre" falta "no está" "brew install node"; return; fi
+    if ! command -v node >/dev/null 2>&1; then resultado node "$nombre" falta "no está" "Lo instala el instalador de Drazo (Node oficial en la carpeta de Drazo, sin contraseña)."; return; fi
     v="$(leer_version "$(node --version 2>/dev/null)")"
-    if ! version_minima "$v" "$NODE_MINIMO"; then resultado node "$nombre" falta "versión $v" "brew install node (o brew upgrade node)"; return; fi
-    if ! command -v npm >/dev/null 2>&1; then resultado node "$nombre" falta "$v sin npm" "brew reinstall node"; return; fi
+    if ! version_minima "$v" "$NODE_MINIMO"; then resultado node "$nombre" falta "versión $v" "El instalador de Drazo pone Node $VERSION_NODE en su carpeta."; return; fi
+    if ! command -v npm >/dev/null 2>&1; then resultado node "$nombre" falta "$v sin npm" "El instalador de Drazo pone Node $VERSION_NODE (con npm) en su carpeta."; return; fi
     resultado node "$nombre" ok "$v"
 }
 
 comprobar_claude() {
-    local c; c="$(ruta_claude)"
-    if [ -z "$c" ]; then resultado claude "Claude Code" falta "no está" "curl -fsSL https://claude.ai/install.sh | bash"; return; fi
-    resultado claude "Claude Code" ok "$(leer_version "$("$c" --version 2>/dev/null)")"
+    local nombre="Claude (app de escritorio o Claude Code)" c partes=""
+    [ -n "$(ruta_app_escritorio)" ] && partes="app de escritorio"
+    c="$(ruta_claude)"
+    [ -n "$c" ] && partes="${partes:+$partes y }Claude Code $(leer_version "$("$c" --version 2>/dev/null)")"
+    if [ -n "$partes" ]; then resultado claude "$nombre" ok "$partes"; return; fi
+    if [ "${CLAUDECODE:-}" = "1" ]; then resultado claude "$nombre" ok "esta sesión de Claude Code"; return; fi
+    resultado claude "$nombre" falta "no está" "Instala la app de escritorio de Claude (claude.com/download) y entra con tu cuenta de Claude Max."
 }
 
 comprobar_cuenta() {
     local nombre="Cuenta de Claude Max (5x o superior)" c json sesion plan
     c="$(ruta_claude)"
-    if [ -z "$c" ]; then resultado cuenta "$nombre" falta "sin Claude Code" "Instala Claude Code y entra con tu cuenta de Claude Max."; return; fi
+    if [ -z "$c" ]; then resultado cuenta "$nombre" aviso "sin la orden claude no se puede mirar el plan" "Comprueba en claude.ai que tu plan es Max 5x o superior."; return; fi
     json="$("$c" auth status --json 2>/dev/null)"
     if [ -z "$json" ]; then resultado cuenta "$nombre" aviso "no se pudo leer" "Abre una terminal, escribe claude y entra con tu cuenta de Claude Max."; return; fi
     sesion="$(printf '%s' "$json" | json_eval 'd && d.loggedIn')"
@@ -261,34 +293,28 @@ comprobar_cuenta() {
     esac
 }
 
+# El ffmpeg de Drazo va en su carpeta y entra el primero en el PATH (cargar_rutas_drazo y entorno.sh).
 comprobar_ffmpeg() {
-    local nombre="ffmpeg con libx264 y zscale" f completo="" brew primera faltan=""
-    brew="$(ruta_brew)"
-    [ -n "$brew" ] && completo="$(dirname "$(dirname "$brew")")/opt/ffmpeg-full/bin/ffmpeg"
+    local nombre="ffmpeg con libx264 y zscale" f primera faltan=""
     f="$(command -v ffmpeg 2>/dev/null)"
-    if [ -z "$f" ]; then
-        if [ -n "$completo" ] && [ -x "$completo" ]; then resultado ffmpeg "$nombre" falta "ffmpeg-full instalado, pero fuera del PATH" "Abre una terminal nueva: el entorno de Drazo lo pone el primero."; return; fi
-        resultado ffmpeg "$nombre" falta "no está" "brew install ffmpeg-full"; return
-    fi
+    if [ -z "$f" ]; then resultado ffmpeg "$nombre" falta "no está" "Lo instala el instalador de Drazo (ffmpeg estático con zscale en la carpeta de Drazo)."; return; fi
     primera="$("$f" -hide_banner -version 2>/dev/null | head -n 1 | sed 's/^ffmpeg version //; s/ Copyright.*//')"
     "$f" -hide_banner -version 2>/dev/null | grep -q -- '--enable-libx264' || faltan="libx264"
     "$f" -hide_banner -filters 2>/dev/null | grep -q ' zscale ' || faltan="${faltan:+$faltan, }zscale"
     command -v ffprobe >/dev/null 2>&1 || faltan="${faltan:+$faltan, }ffprobe"
-    if [ -n "$faltan" ]; then
-        if [ -n "$completo" ] && [ -x "$completo" ] && [ "$f" != "$completo" ]; then
-            resultado ffmpeg "$nombre" falta "$primera sin $faltan ($f)" "ffmpeg-full ya está instalado: abre una terminal nueva para que vaya el primero."; return
-        fi
-        resultado ffmpeg "$nombre" falta "$primera sin $faltan ($f)" "brew install ffmpeg-full (el ffmpeg normal de Homebrew no trae zscale)"; return
-    fi
-    resultado ffmpeg "$nombre" ok "$primera"
+    if [ -n "$faltan" ]; then resultado ffmpeg "$nombre" falta "$primera sin $faltan ($f)" "El instalador de Drazo pone un ffmpeg completo en su carpeta, delante del actual."; return; fi
+    resultado ffmpeg "$nombre" ok "$primera ($f)"
 }
 
+# En Mac el Python del entorno lo trae uv, sin contraseña; un Python del sistema solo sirve de reserva.
 comprobar_python() {
-    local nombre="Python 3.10 o superior"
+    local nombre="uv (trae el Python de Drazo)" uv
+    uv="$(command -v uv 2>/dev/null)"
+    if [ -n "$uv" ]; then resultado python "$nombre" ok "uv $(leer_version "$("$uv" --version 2>/dev/null)") ($uv)"; return; fi
+    if [ -x "$DRAZO_PYTHON" ]; then resultado python "$nombre" ok "no hace falta: el entorno de Drazo ya existe"; return; fi
     buscar_python_base
-    if [ -n "$PY_BASE_EXE" ]; then resultado python "$nombre" ok "$PY_BASE_VERSION ($PY_BASE_EXE)"; return; fi
-    if [ -x "$DRAZO_PYTHON" ]; then resultado python "$nombre" aviso "no hay Python en el sistema, pero el entorno de Drazo existe" "Solo hace falta para rehacer el entorno: brew install python@3.12"; return; fi
-    resultado python "$nombre" falta "no está (los de conda no sirven)" "brew install python@3.12"
+    if [ -n "$PY_BASE_EXE" ]; then resultado python "$nombre" aviso "sin uv; hay Python $PY_BASE_VERSION ($PY_BASE_EXE)" "El instalador de Drazo pone uv en su carpeta (recomendado)."; return; fi
+    resultado python "$nombre" falta "no está" "Lo instala el instalador de Drazo (uv en la carpeta de Drazo, sin contraseña)."
 }
 
 comprobar_venv() {
@@ -327,7 +353,7 @@ comprobar_playwright() {
 
 comprobar_chrome() {
     local app; app="$(ruta_chrome)"
-    if [ -z "$app" ]; then resultado chrome "Google Chrome" falta "no está" "brew install --cask google-chrome (o descárgalo de google.com/chrome)"; return; fi
+    if [ -z "$app" ]; then resultado chrome "Google Chrome" falta "no está" "Lo instala el instalador de Drazo (descarga oficial de Google, sin contraseña)."; return; fi
     resultado chrome "Google Chrome" ok "$(defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null)"
 }
 
@@ -355,11 +381,13 @@ comprobar_fuentes() {
     resultado fuentes "Fuentes de las plantillas" ok "Anton, Caveat, Poppins, Inter y JetBrains Mono"
 }
 
+# Vale cualquiera de las dos: el env de los ajustes de Claude (lo que pone el instalador) o la variable.
 comprobar_telemetria() {
-    local nombre="Telemetría de HyperFrames apagada" v
-    v="${HYPERFRAMES_NO_TELEMETRY:-$(valor_entorno HYPERFRAMES_NO_TELEMETRY)}"
-    if [ "$v" = "1" ]; then resultado telemetria "$nombre" ok "HYPERFRAMES_NO_TELEMETRY=1"; return; fi
-    resultado telemetria "$nombre" falta "sin HYPERFRAMES_NO_TELEMETRY=1" "La pone el instalador de Drazo (en el entorno de Drazo)."
+    local nombre="Telemetría de HyperFrames apagada"
+    estado_ajustes
+    if [ "${AJ_telemetria:-}" = "si" ]; then resultado telemetria "$nombre" ok "HYPERFRAMES_NO_TELEMETRY=1 en los ajustes de Claude"; return; fi
+    if [ "${HYPERFRAMES_NO_TELEMETRY:-}" = "1" ]; then resultado telemetria "$nombre" ok "HYPERFRAMES_NO_TELEMETRY=1"; return; fi
+    resultado telemetria "$nombre" falta "sin HYPERFRAMES_NO_TELEMETRY=1" "La apaga el instalador de Drazo (en los ajustes de Claude)."
 }
 
 comprobar_tesseract() {
@@ -375,60 +403,52 @@ comprobar_tesseract() {
     resultado tesseract "$nombre" ok "tsrct $v y sus skills" 1
 }
 
+# La clave vive en los ajustes de Claude (pluginConfigs), que es de donde la toma el plugin.
 comprobar_licencia() {
-    local nombre="Clave de licencia (DRAZO_LICENCIA)" guardada clave visible
-    guardada="$(valor_entorno DRAZO_LICENCIA)"
-    clave="${DRAZO_LICENCIA:-$guardada}"
-    if [ -z "$clave" ]; then resultado licencia "$nombre" falta "no está" "Vuelve a ejecutar el instalador de Drazo y pega tu clave (empieza por drz_)."; return; fi
-    visible="drz_…${clave: -4}"
-    case "$clave" in drz_*) ;; *) resultado licencia "$nombre" aviso "no empieza por drz_" "Revisa que pegaste la clave completa de Drazo."; return ;; esac
-    if [ -z "$DRAZO_LICENCIA" ]; then resultado licencia "$nombre" aviso "$visible guardada, pero esta terminal no la ve" "Abre una terminal nueva y abre Claude Code desde ella."; return; fi
-    resultado licencia "$nombre" ok "$visible"
+    local nombre="Clave de licencia en Claude"
+    if ! estado_ajustes; then resultado licencia "$nombre" falta "sin Node.js no se pueden leer los ajustes de Claude" "Instala Node.js con el instalador de Drazo."; return; fi
+    if [ "${AJ_ajustes:-}" = "json-invalido" ]; then resultado licencia "$nombre" falta "los ajustes de Claude no se pueden leer" "Revisa el fichero: ${AJ_detalle:-}"; return; fi
+    if [ "${AJ_licencia:-}" != "si" ]; then resultado licencia "$nombre" falta "no está guardada" "Guárdala con el paso «registrar» del instalador de Drazo y tu clave drz_."; return; fi
+    if [ "${AJ_licencia_formato:-}" != "si" ]; then resultado licencia "$nombre" aviso "no empieza por drz_" "Revisa que guardaste la clave completa de Drazo."; return; fi
+    resultado licencia "$nombre" ok "${AJ_licencia_tapada:-}"
 }
 
-# Los motores de Drazo se descargan con un comando bash (curl ... | node ...) que lee $DRAZO_LICENCIA.
-# La Bash de Claude Code no hereda las variables de ~/.zshrc, pero zsh lee ~/.zshenv siempre:
-# se mira esta sesión y también un zsh limpio, que es lo que verá Claude Code al abrirse.
+# Los motores de Drazo se instalan con una orden bash (curl ... | node ...) en la terminal Bash de Claude.
+# Esa terminal no hereda lo que exporta ~/.zshrc, pero zsh lee ~/.zshenv siempre: se mira esta sesión
+# y también un zsh limpio, que es lo que tendrá Claude al abrirse de nuevo.
 comprobar_bash() {
     local nombre="Terminal Bash de Claude Code" salida limpio="" faltan=""
-    salida="$(bash -c 'command -v curl >/dev/null && echo curl=si || echo curl=no; command -v node >/dev/null && echo node=si || echo node=no; [ ${#DRAZO_LICENCIA} -gt 0 ] && echo clave=si || echo clave=no' 2>/dev/null)"
+    salida="$(bash -c 'command -v curl >/dev/null && echo curl=si || echo curl=no; command -v node >/dev/null && echo node=si || echo node=no' 2>/dev/null)"
     case "$salida" in *curl=si*) ;; *) faltan="curl" ;; esac
     case "$salida" in *node=si*) ;; *) faltan="${faltan:+$faltan, }node" ;; esac
-    if [ -n "$faltan" ]; then resultado bash "$nombre" falta "bash no encuentra: $faltan" "Vuelve a ejecutar el instalador de Drazo y abre una terminal nueva."; return; fi
-    if [ -x /bin/zsh ]; then
-        limpio="$(env -i HOME="$HOME" /bin/zsh -c '[ ${#DRAZO_LICENCIA} -gt 0 ] && echo clave=si || echo clave=no' 2>/dev/null)"
-    fi
-    case "$salida" in
-        *clave=si*)
-            if [ "$limpio" = "clave=no" ]; then
-                resultado bash "$nombre" aviso "esta sesión ve la clave, pero un zsh nuevo no la carga" "Vuelve a ejecutar el instalador de Drazo: deja la clave en ~/.zshenv para que la vea siempre."; return
-            fi
-            resultado bash "$nombre" ok "curl, node y la clave DRAZO_LICENCIA visibles" ;;
-        *)
-            if [ "$limpio" = "clave=si" ]; then
-                resultado bash "$nombre" falta "la clave está guardada, pero esta sesión no la ve" "Cierra Claude Code y la terminal, abre una terminal nueva y vuelve a escribir claude."
-            else
-                resultado bash "$nombre" falta "la clave DRAZO_LICENCIA no se ve desde bash" "Pon tu clave con el instalador de Drazo y abre Claude Code desde una terminal nueva."
-            fi ;;
+    if [ -n "$faltan" ]; then resultado bash "$nombre" falta "bash no encuentra: $faltan" "Instala lo que falta con el instalador de Drazo y cierra y vuelve a abrir la app de Claude."; return; fi
+    # Solo hace falta mirarlo si el node que se usa es el de la carpeta de Drazo (lo carga entorno.sh).
+    case "$(command -v node)" in
+        "$DRAZO_NODEJS"/*)
+            [ -x /bin/zsh ] && limpio="$(env -i HOME="$HOME" PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/zsh -c 'command -v node >/dev/null && echo node=si || echo node=no' 2>/dev/null)" ;;
     esac
+    if [ "$limpio" = "node=no" ]; then resultado bash "$nombre" falta "esta sesión ve node, pero una terminal nueva no" "Vuelve a ejecutar el paso «node» del instalador de Drazo: deja la ruta en ~/.zshenv."; return; fi
+    resultado bash "$nombre" ok "curl y node visibles"
 }
 
+# Registrado = marketplace y plugin en los ajustes de Claude. La app lo descarga al abrirse de nuevo.
 comprobar_plugin() {
-    local nombre="Plugin drazo en Claude Code" c json fila activo version ambito errores
-    c="$(ruta_claude)"
-    if [ -z "$c" ]; then resultado plugin "$nombre" falta "sin Claude Code" "Instala Claude Code y vuelve a ejecutar el instalador de Drazo."; return; fi
-    json="$("$c" plugin list --json 2>/dev/null)"
-    fila="$(printf '%s' "$json" | ID_PLUGIN="$ID_PLUGIN" json_eval '(Array.isArray(d) ? d : []).filter((p) => p.id === process.env.ID_PLUGIN).map((p) => [p.enabled, p.version, p.scope, (p.errors || []).join("; ")].join("|"))[0] || ""')"
-    if [ -z "$fila" ]; then
-        if ! command -v node >/dev/null 2>&1 && printf '%s' "$json" | grep -q "\"$ID_PLUGIN\""; then
-            resultado plugin "$nombre" ok "instalado (sin Node no se ve el detalle)"; return
-        fi
-        resultado plugin "$nombre" falta "no instalado" "Lo instala el instalador de Drazo (claude plugin install drazo@drazo)."; return
-    fi
-    IFS='|' read -r activo version ambito errores <<< "$fila"
-    if [ -n "$errores" ]; then resultado plugin "$nombre" falta "con errores: $errores" "Vuelve a ejecutar el instalador de Drazo; si sigue, escribe al soporte."; return; fi
-    if [ "$activo" != "true" ]; then resultado plugin "$nombre" falta "$version desactivado" "Actívalo: claude plugin enable drazo@drazo"; return; fi
-    resultado plugin "$nombre" ok "versión $version, ámbito $ambito"
+    local nombre="Drazo registrado en Claude"
+    if ! estado_ajustes; then resultado plugin "$nombre" falta "sin Node.js no se pueden leer los ajustes de Claude" "Instala Node.js con el instalador de Drazo."; return; fi
+    if [ "${AJ_ajustes:-}" = "json-invalido" ]; then resultado plugin "$nombre" falta "los ajustes de Claude no se pueden leer" "Revisa el fichero: ${AJ_detalle:-}"; return; fi
+    if [ "${AJ_marketplace:-}" != "si" ] || [ "${AJ_activado:-}" != "si" ]; then resultado plugin "$nombre" falta "no está registrado" "Regístralo con el paso «registrar» del instalador de Drazo."; return; fi
+    if [ "${AJ_descargado:-}" != "si" ]; then resultado plugin "$nombre" aviso "registrado (${AJ_fuente:-}), aún sin descargar" "Cierra la app de Claude y vuelve a abrirla: Drazo se descarga al arrancar."; return; fi
+    if [ -n "${AJ_version:-}" ]; then resultado plugin "$nombre" ok "registrado y descargado (versión $AJ_version)"; return; fi
+    resultado plugin "$nombre" ok "registrado, cargado desde ${AJ_fuente:-}"
+}
+
+comprobar_registro() {
+    local pe pd pa
+    comprobar_plugin; pe="$RES_ESTADO"; pd="$RES_DETALLE"; pa="$RES_ARREGLO"
+    [ "$pe" = "falta" ] && return 0
+    comprobar_licencia
+    [ "$RES_ESTADO" != "ok" ] && return 0
+    resultado registrar "Drazo registrado con tu licencia" "$pe" "$pd; licencia $RES_DETALLE" "$pa"
 }
 
 comprobar_disco() {

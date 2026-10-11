@@ -1,30 +1,40 @@
 #!/bin/bash
-# Instalador de Drazo Pro para macOS.
-# Comprueba cada requisito y, si falta, lo instala pidiendo permiso en cada paso. Al final pasa el doctor.
+# Instalador de Drazo Pro para macOS. Sin Homebrew ni sudo: todo va en la carpeta de Drazo
+# (~/.local/share/drazo). Normalmente lo ejecuta Claude siguiendo INSTALAR.md, después de pedir
+# permiso en el chat; también sirve a mano desde la Terminal.
 # Uso:
-#   bash instalar.sh                              instala lo que falte
-#   bash instalar.sh --solo-comprobar             solo mira, no cambia nada
-#   bash instalar.sh --marketplace <ruta o repo>  otra fuente para el marketplace (para pruebas)
+#   bash instalar.sh --solo-comprobar                         solo mira, no cambia nada
+#   bash instalar.sh --doctor                                 pasa el doctor completo (también prueba el servidor)
+#   bash instalar.sh --si [--pasos git,node,...] [--licencia drz_...]   sin preguntas
+#   bash instalar.sh                                          pregunta antes de cada paso
+#   bash instalar.sh --marketplace <carpeta del repo>         registra Drazo desde una carpeta (pruebas)
+# Pasos: git node claude ffmpeg python venv modelo playwright chrome navegador skills fuentes telemetria tesseract registrar
+# Salida por paso: «== [paso] ...» al empezar y «-> [paso] ok|ya estaba|falta|error|pendiente: ...» al acabar.
+# Código de salida: 0 todo bien · 1 algún paso no quedó bien · 2 uso incorrecto · 3 equipo no compatible
+#                   · 4 esperando al usuario (ventana de Apple de las herramientas de desarrollo).
 
-# Repo de GitHub con el marketplace y el plugin de Drazo (aún no publicado).
 REPO_DRAZO="davidmadrazo/drazo-pro"
 RAMA_DRAZO="main"
 URL_BASE_DRAZO="https://raw.githubusercontent.com/$REPO_DRAZO/$RAMA_DRAZO"
 
-SOLO_COMPROBAR=0
-MARKETPLACE=""
+SOLO_COMPROBAR=0; DOCTOR=0; SI=0; PASOS=""; LICENCIA=""; MARKETPLACE=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --solo-comprobar) SOLO_COMPROBAR=1 ;;
+        --doctor) DOCTOR=1 ;;
+        --si) SI=1 ;;
+        --pasos) PASOS="$2"; shift ;;
+        --licencia) LICENCIA="$2"; shift ;;
         --marketplace) MARKETPLACE="$2"; shift ;;
-        *) echo "Opción desconocida: $1 (usa --solo-comprobar o --marketplace <fuente>)"; exit 2 ;;
+        *) echo "Opción desconocida: $1 (usa --solo-comprobar, --si, --pasos, --licencia o --marketplace)"; exit 2 ;;
     esac
     shift
 done
 
-FICHEROS_PLUGIN=".mcp.json scripts/drazo-comun.sh scripts/drazo-doctor.sh scripts/comprobar-servidor.mjs scripts/comprobar-python.py scripts/requisitos-python.txt scripts/fuentes.txt"
+FICHEROS_PLUGIN=".mcp.json scripts/drazo-comun.sh scripts/drazo-doctor.sh scripts/comprobar-servidor.mjs scripts/ajustes-claude.mjs scripts/comprobar-python.py scripts/requisitos-python.txt scripts/fuentes.txt"
 CARPETA_TEMPORAL=""
 PLUGIN=""
+CODIGO=1
 trap '[ -n "$CARPETA_TEMPORAL" ] && rm -rf "$CARPETA_TEMPORAL"' EXIT
 
 # Desde una copia del repo usa sus ficheros; si el instalador llega suelto, baja los que necesita.
@@ -45,9 +55,10 @@ preparar_plugin() {
     done
 }
 
-# Las respuestas se leen de la terminal aunque el script llegue por una tubería (curl | bash).
+# Con --si no pregunta (el permiso se pidió en el chat). Sin --si lee de la terminal aunque llegue por tubería.
 preguntar() {
     local defecto="${2:-s}" sufijo="[S/n]" r
+    [ "$SI" = "1" ] && return 0
     [ "$defecto" = "n" ] && sufijo="[s/N]"
     while true; do
         printf '%s %s ' "$1" "$sufijo" > /dev/tty
@@ -61,122 +72,147 @@ preguntar() {
     done
 }
 
-paso() { echo ""; echo "${C_CIAN}== $1${C_FIN}"; }
-
-requiere_brew() {
-    command -v brew >/dev/null 2>&1 && return 0
-    echo "${C_ROJO}Falta Homebrew: no puedo seguir con este paso.${C_FIN}"
-    return 1
-}
-
-requiere_node() {
-    command -v npm >/dev/null 2>&1 && return 0
-    echo "${C_ROJO}Falta Node.js: no puedo seguir con este paso.${C_FIN}"
-    return 1
-}
-
-# El entorno de Drazo (clave, telemetría, rutas) vive en entorno.sh, que solo tiene exports.
-# ~/.zshenv lo lee todo zsh, también la Bash de Claude Code (que no hereda lo de ~/.zshrc);
-# ~/.zshrc lo vuelve a cargar después del path_helper de macOS para que ffmpeg-full vaya el primero.
-asegurar_perfil() {
+# entorno.sh solo lleva rutas (node, ffmpeg y uv de Drazo). Lo carga ~/.zshenv, que lee todo zsh (también
+# la terminal de Claude), y ~/.zshrc, que lo vuelve a cargar después del path_helper de macOS.
+asegurar_entorno() {
     local perfil linea='[ -f "$HOME/.local/share/drazo/entorno.sh" ] && . "$HOME/.local/share/drazo/entorno.sh"'
+    mkdir -p "$DRAZO_DATOS"
+    {
+        printf '# Entorno de Drazo Pro: lo escribe el instalador de Drazo.\n'
+        printf 'for _d in "$HOME/.local/share/drazo/uv" "$HOME/.local/share/drazo/nodejs/bin" "$HOME/.local/share/drazo/ffmpeg"; do\n'
+        printf '    case ":$PATH:" in *":$_d:"*) ;; *) [ -d "$_d" ] && PATH="$_d:$PATH" ;; esac\n'
+        printf 'done\nunset _d\nexport PATH\n'
+    } > "$DRAZO_ENTORNO"
     for perfil in "$HOME/.zshenv" "$HOME/.zshrc" "$HOME/.bash_profile"; do
         if [ "$perfil" = "$HOME/.bash_profile" ] && [ ! -f "$perfil" ]; then continue; fi
         grep -qF '.local/share/drazo/entorno.sh' "$perfil" 2>/dev/null && continue
         printf '\n# Drazo Pro\n%s\n' "$linea" >> "$perfil"
     done
+    cargar_rutas_drazo
 }
 
-preparar_entorno() {
-    mkdir -p "$DRAZO_DATOS"
-    if [ ! -f "$DRAZO_ENTORNO" ]; then
-        printf '# Entorno de Drazo Pro: lo escribe el instalador de Drazo.\n' > "$DRAZO_ENTORNO"
-    fi
-    chmod 600 "$DRAZO_ENTORNO"
-    asegurar_perfil
+# Descarga a un fichero y comprueba su SHA-256; si no coincide, lo borra y falla.
+descargar_verificado() {
+    local url="$1" destino="$2" esperado="$3" real
+    curl -fL --retry 2 -o "$destino" "$url" || return 1
+    real="$(shasum -a 256 "$destino" | awk '{ print $1 }')"
+    if [ "$real" != "$esperado" ]; then echo "La huella SHA-256 de $(basename "$destino") no coincide: no se instala."; rm -f "$destino"; return 1; fi
 }
 
-# export NOMBRE='valor' en entorno.sh, sustituyendo el que hubiera.
-entorno_poner() {
-    preparar_entorno
-    grep -v "^export $1=" "$DRAZO_ENTORNO" > "$DRAZO_ENTORNO.tmp"
-    printf "export %s='%s'\n" "$1" "$2" >> "$DRAZO_ENTORNO.tmp"
-    mv "$DRAZO_ENTORNO.tmp" "$DRAZO_ENTORNO"
-    chmod 600 "$DRAZO_ENTORNO"
-}
-
-entorno_linea() {
-    preparar_entorno
-    grep -qxF -- "$1" "$DRAZO_ENTORNO" || printf '%s\n' "$1" >> "$DRAZO_ENTORNO"
-}
-
-instalar_brew() {
-    local b
-    if [ -z "$(ruta_brew)" ]; then
-        echo "Instalando Homebrew con su instalador oficial (te pedirá la contraseña del Mac)..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    fi
-    b="$(ruta_brew)"
-    [ -n "$b" ] || return 1
-    # Rutas fijas en lugar de «eval brew shellenv»: entorno.sh lo carga cada zsh y así no lanza procesos.
-    entorno_linea "export PATH=\"$(dirname "$b"):$(dirname "$(dirname "$b")")/sbin:\$PATH\""
-    cargar_brew
-}
-
+# git llega con las herramientas de desarrollo de Apple: macOS abre su ventana y la persona pulsa «Instalar».
+# Se espera como mucho 9 minutos (las órdenes de Claude en primer plano se cortan a los 10).
 instalar_git() {
-    if command -v brew >/dev/null 2>&1; then brew install git; return; fi
-    xcode-select --install
-    echo "Acepta la ventana de Apple y, cuando termine, vuelve a ejecutar el instalador de Drazo."
+    local espera=0
+    tiene_clt && return 0
+    xcode-select --install >/dev/null 2>&1
+    echo "Se ha abierto una ventana de Apple para instalar las herramientas de desarrollo: hay que pulsar «Instalar»."
+    while [ "$espera" -lt 540 ]; do
+        sleep 15; espera=$((espera + 15))
+        tiene_clt && return 0
+    done
+    echo "Aún se están instalando. Cuando termine la ventana de Apple, repite este paso."
+    return 4
 }
 
-instalar_node() { requiere_brew && brew install node; }
-
-instalar_claude() {
-    echo "Instalando Claude Code con el instalador oficial de Anthropic..."
-    curl -fsSL https://claude.ai/install.sh | bash
-    export PATH="$HOME/.local/bin:$PATH"
+instalar_node() {
+    local arq tar sha tmp
+    arq="$(arquitectura)"
+    if [ "$arq" = "arm64" ]; then tar="node-v$VERSION_NODE-darwin-arm64.tar.gz"; sha="$SHA256_NODE_ARM64"; else tar="node-v$VERSION_NODE-darwin-x64.tar.gz"; sha="$SHA256_NODE_X86_64"; fi
+    tmp="$(mktemp -d)"
+    echo "Descargando Node.js $VERSION_NODE (oficial de nodejs.org)..."
+    descargar_verificado "https://nodejs.org/dist/v$VERSION_NODE/$tar" "$tmp/$tar" "$sha" || { rm -rf "$tmp"; return 1; }
+    rm -rf "$DRAZO_NODEJS" && mkdir -p "$DRAZO_NODEJS"
+    tar -xzf "$tmp/$tar" -C "$DRAZO_NODEJS" --strip-components 1
+    rm -rf "$tmp"
+    asegurar_entorno
 }
 
-# El ffmpeg normal de Homebrew no trae zscale; ffmpeg-full sí, pero no se enlaza en el PATH.
+# ffmpeg y ffprobe 9.0.2 estáticos (con libx264 y zscale) de ffmpeg.martin-riedl.de; descargados con curl,
+# que no les pone la marca de cuarentena, así que macOS no los bloquea.
 instalar_ffmpeg() {
-    requiere_brew || return 1
-    brew install ffmpeg-full || return 1
-    entorno_linea "export PATH=\"$(brew --prefix)/opt/ffmpeg-full/bin:\$PATH\""
-    export PATH="$(brew --prefix)/opt/ffmpeg-full/bin:$PATH"
+    local arq url sha_ffmpeg sha_ffprobe tmp
+    arq="$(arquitectura)"
+    if [ "$arq" = "arm64" ]; then url="$URL_FFMPEG_ARM64"; sha_ffmpeg="$SHA256_FFMPEG_ARM64"; sha_ffprobe="$SHA256_FFPROBE_ARM64"
+    else url="$URL_FFMPEG_X86_64"; sha_ffmpeg="$SHA256_FFMPEG_X86_64"; sha_ffprobe="$SHA256_FFPROBE_X86_64"; fi
+    tmp="$(mktemp -d)"
+    echo "Descargando ffmpeg 9.0.2 completo (unos 60 MB)..."
+    descargar_verificado "$url/ffmpeg.zip" "$tmp/ffmpeg.zip" "$sha_ffmpeg" || { rm -rf "$tmp"; return 1; }
+    descargar_verificado "$url/ffprobe.zip" "$tmp/ffprobe.zip" "$sha_ffprobe" || { rm -rf "$tmp"; return 1; }
+    mkdir -p "$DRAZO_FFMPEG"
+    ditto -x -k "$tmp/ffmpeg.zip" "$DRAZO_FFMPEG" && ditto -x -k "$tmp/ffprobe.zip" "$DRAZO_FFMPEG"
+    chmod +x "$DRAZO_FFMPEG/ffmpeg" "$DRAZO_FFMPEG/ffprobe"
+    rm -rf "$tmp"
+    asegurar_entorno
 }
 
-instalar_python() { requiere_brew && brew install python@3.12; }
+# uv trae el Python 3.12 del entorno de Drazo, sin contraseña.
+instalar_python() {
+    local arq tar sha tmp
+    arq="$(arquitectura)"
+    if [ "$arq" = "arm64" ]; then tar="uv-aarch64-apple-darwin.tar.gz"; sha="$SHA256_UV_ARM64"; else tar="uv-x86_64-apple-darwin.tar.gz"; sha="$SHA256_UV_X86_64"; fi
+    tmp="$(mktemp -d)"
+    echo "Descargando uv $VERSION_UV..."
+    descargar_verificado "https://github.com/astral-sh/uv/releases/download/$VERSION_UV/$tar" "$tmp/$tar" "$sha" || { rm -rf "$tmp"; return 1; }
+    mkdir -p "$DRAZO_UV"
+    tar -xzf "$tmp/$tar" -C "$DRAZO_UV" --strip-components 1
+    rm -rf "$tmp"
+    asegurar_entorno
+}
 
 instalar_venv() {
-    buscar_python_base
-    if [ -z "$PY_BASE_EXE" ]; then echo "${C_ROJO}No hay un Python 3.10 o superior para crear el entorno.${C_FIN}"; return 1; fi
+    local uv; uv="$(command -v uv 2>/dev/null)"
     mkdir -p "$DRAZO_DATOS"
-    if [ ! -x "$DRAZO_PYTHON" ] || ! "$DRAZO_PYTHON" -c 'import sys' >/dev/null 2>&1; then
-        echo "Creando el entorno con Python $PY_BASE_VERSION..."
-        "$PY_BASE_EXE" -m venv --clear "$DRAZO_VENV" || return 1
+    if [ -n "$uv" ]; then
+        export UV_PYTHON_INSTALL_DIR="$DRAZO_DATOS/python" UV_CACHE_DIR="$DRAZO_DATOS/uv-cache"
+        if [ ! -x "$DRAZO_PYTHON" ] || ! "$DRAZO_PYTHON" -c 'import sys' >/dev/null 2>&1; then
+            echo "Creando el entorno con Python 3.12 (uv)..."
+            "$uv" venv --clear --seed --python 3.12 "$DRAZO_VENV" || return 1
+        fi
+        echo "Instalando los paquetes de Python de Drazo (tarda unos minutos)..."
+        "$uv" pip install --python "$DRAZO_PYTHON" -r "$REQUISITOS_PYTHON"
+        return
     fi
-    echo "Instalando los paquetes de Python de Drazo (tarda unos minutos)..."
+    buscar_python_base
+    if [ -z "$PY_BASE_EXE" ]; then echo "Falta uv (paso python)."; return 1; fi
+    if [ ! -x "$DRAZO_PYTHON" ] || ! "$DRAZO_PYTHON" -c 'import sys' >/dev/null 2>&1; then "$PY_BASE_EXE" -m venv --clear "$DRAZO_VENV" || return 1; fi
     "$DRAZO_PYTHON" -m pip install --disable-pip-version-check --upgrade pip
     "$DRAZO_PYTHON" -m pip install --disable-pip-version-check -r "$REQUISITOS_PYTHON"
 }
 
 instalar_modelo() {
-    if [ ! -x "$DRAZO_PYTHON" ]; then echo "${C_ROJO}Falta el entorno de Python de Drazo: no puedo descargar el modelo.${C_FIN}"; return 1; fi
-    echo "Descargando el modelo de transcripción large-v3-turbo (unos 1,6 GB; tarda según tu conexión)..."
+    if [ ! -x "$DRAZO_PYTHON" ]; then echo "Falta el entorno de Python de Drazo (paso venv)."; return 1; fi
+    echo "Descargando el modelo de transcripción large-v3-turbo (unos 1,6 GB; tarda según la conexión)..."
     "$DRAZO_PYTHON" -c "from faster_whisper import download_model; download_model('large-v3-turbo')"
 }
 
 instalar_playwright() {
-    requiere_node || return 1
+    command -v npm >/dev/null 2>&1 || { echo "Falta Node.js (paso node)."; return 1; }
     mkdir -p "$DRAZO_NODE"
     npm install --prefix "$DRAZO_NODE" --no-audit --no-fund playwright-core
 }
 
-instalar_chrome() { requiere_brew && brew install --cask google-chrome; }
+# Chrome oficial de Google: a /Applications si se puede escribir ahí (cuentas de administrador), si no a ~/Applications.
+instalar_chrome() {
+    local tmp destino="/Applications"
+    tmp="$(mktemp -d)"
+    echo "Descargando Google Chrome (unos 250 MB)..."
+    curl -fL --retry 2 -o "$tmp/chrome.dmg" "https://dl.google.com/chrome/mac/universal/stable/GGRO/googlechrome.dmg" || { rm -rf "$tmp"; return 1; }
+    hdiutil attach -nobrowse -readonly -quiet -mountpoint "$tmp/volumen" "$tmp/chrome.dmg" || { rm -rf "$tmp"; return 1; }
+    [ -w "$destino" ] || { destino="$HOME/Applications"; mkdir -p "$destino"; }
+    ditto "$tmp/volumen/Google Chrome.app" "$destino/Google Chrome.app"
+    hdiutil detach -quiet "$tmp/volumen"
+    rm -rf "$tmp"
+}
 
-instalar_navegador() { requiere_node && HYPERFRAMES_NO_TELEMETRY=1 npx --yes hyperframes browser ensure; }
+instalar_navegador() {
+    command -v npx >/dev/null 2>&1 || { echo "Falta Node.js (paso node)."; return 1; }
+    HYPERFRAMES_NO_TELEMETRY=1 npx --yes hyperframes browser ensure
+}
 
-instalar_skills() { requiere_node && npx --yes skills add heygen-com/hyperframes -g -a claude-code --skill '*' -y; }
+instalar_skills() {
+    command -v npx >/dev/null 2>&1 || { echo "Falta Node.js (paso node)."; return 1; }
+    npx --yes skills add heygen-com/hyperframes -g -a claude-code --skill '*' -y
+}
 
 # Fuentes en ~/Library/Fonts (solo para tu usuario), con su huella SHA-256 comprobada.
 instalar_fuentes() {
@@ -190,52 +226,46 @@ instalar_fuentes() {
     while IFS='|' read -r familia ruta archivo nombre sha; do
         case "$familia" in ""|\#*|commit) continue ;; esac
         case "$faltan" in *"|$familia|"*) ;; *) continue ;; esac
-        if ! curl -fsSL "https://raw.githubusercontent.com/google/fonts/$commit/$ruta" -o "$tmp/$archivo"; then
-            echo "  no pude descargar $archivo"; continue
-        fi
-        if [ "$(shasum -a 256 "$tmp/$archivo" | awk '{ print $1 }')" != "$sha" ]; then
-            echo "  $archivo no coincide con su huella SHA-256: no se instala."; continue
-        fi
+        descargar_verificado "https://raw.githubusercontent.com/google/fonts/$commit/$ruta" "$tmp/$archivo" "$sha" || continue
         cp "$tmp/$archivo" "$CARPETA_FUENTES/$archivo" && echo "  instalada $archivo"
     done < "$LISTA_FUENTES"
     rm -rf "$tmp"
-    echo "Las aplicaciones que ya estaban abiertas verán las fuentes al reiniciarse."
 }
 
-instalar_telemetria() {
-    entorno_poner HYPERFRAMES_NO_TELEMETRY 1
-    export HYPERFRAMES_NO_TELEMETRY=1
+ajustes_claude() {
+    command -v node >/dev/null 2>&1 || { echo "Falta Node.js (paso node)."; return 1; }
+    node "$AJUSTES_SCRIPT" "$@"
+    local codigo=$?
+    estado_ajustes --renovar
+    return "$codigo"
 }
+
+instalar_telemetria() { ajustes_claude telemetria; }
 
 instalar_tesseract() {
     local arq sha zip tmp inst v
-    echo "Tesseract es una herramienta de Mirage, no de Drazo, y es opcional."
-    echo "Si lo instalas, aceptas sus condiciones (uso propio):"
-    echo "  https://github.com/mirage-hq/Tesseract/blob/main/TERMS.md"
-    echo "  https://mirage.app/legal/tesseract-terms"
-    preguntar "¿Aceptas sus condiciones e instalo Tesseract?" n || return 0
-    arq="$(uname -m)"
-    [ "$(sysctl -in sysctl.proc_translated 2>/dev/null)" = "1" ] && arq="arm64"
+    arq="$(arquitectura)"
     if [ "$arq" = "arm64" ]; then sha="$SHA256_TESSERACT_ARM64"; zip="tesseract-$VERSION_TESSERACT-darwin-arm64.zip"
     else sha="$SHA256_TESSERACT_X86_64"; zip="tesseract-$VERSION_TESSERACT-darwin-x86_64.zip"; fi
     tmp="$(mktemp -d)"
     echo "Descargando $zip (unos 90 MB)..."
-    if ! curl -fL "https://github.com/mirage-hq/Tesseract/releases/download/v$VERSION_TESSERACT/$zip" -o "$tmp/$zip"; then
-        echo "${C_ROJO}No se pudo descargar Tesseract.${C_FIN}"; rm -rf "$tmp"; return 1
-    fi
-    if [ "$(shasum -a 256 "$tmp/$zip" | awk '{ print $1 }')" != "$sha" ]; then
-        echo "${C_ROJO}La huella SHA-256 del zip no coincide: no se instala.${C_FIN}"; rm -rf "$tmp"; return 1
-    fi
+    descargar_verificado "https://github.com/mirage-hq/Tesseract/releases/download/v$VERSION_TESSERACT/$zip" "$tmp/$zip" "$sha" || { rm -rf "$tmp"; return 1; }
     ditto -x -k "$tmp/$zip" "$tmp/extraido"
     inst="$(find "$tmp/extraido" -name install.sh -type f | head -n 1)"
-    if [ -z "$inst" ]; then echo "${C_ROJO}El zip no trae install.sh.${C_FIN}"; rm -rf "$tmp"; return 1; fi
+    if [ -z "$inst" ]; then echo "El zip no trae install.sh."; rm -rf "$tmp"; return 1; fi
     bash "$inst"
     rm -rf "$tmp"
     v="$(leer_version "$("$TSRCT_RUTA" --version 2>/dev/null)")"
-    if [ "$v" != "$VERSION_TESSERACT" ]; then echo "${C_ROJO}tsrct no responde con la versión $VERSION_TESSERACT (responde «$v»).${C_FIN}"; return 1; fi
-    requiere_node || return 1
+    if [ "$v" != "$VERSION_TESSERACT" ]; then echo "tsrct no responde con la versión $VERSION_TESSERACT (responde «$v»)."; return 1; fi
+    command -v npx >/dev/null 2>&1 || { echo "tsrct está instalado, pero falta Node.js para sus skills."; return 1; }
     npx --yes skills add "https://github.com/mirage-hq/Tesseract/tree/v$VERSION_TESSERACT/skills" -g -a claude-code \
         --skill tesseract-video --skill tesseract-motion -y
+}
+
+instalar_claude() {
+    echo "Instalando Claude Code (la orden claude) con el instalador oficial de Anthropic..."
+    curl -fsSL https://claude.ai/install.sh | bash
+    export PATH="$HOME/.local/bin:$PATH"
 }
 
 pedir_licencia() {
@@ -245,126 +275,146 @@ pedir_licencia() {
         IFS= read -r -s clave < /dev/tty || clave=""
         echo "" > /dev/tty
         clave="$(printf '%s' "$clave" | tr -d '[:space:]')"
-        if [ -z "$clave" ]; then echo "No has pegado nada. Puedes ponerla más tarde volviendo a ejecutar el instalador."; return 0; fi
-        case "$clave" in
-            *\'*|*\"*|*\\*) ;;
-            drz_????????*)
-                entorno_poner DRAZO_LICENCIA "$clave"
-                export DRAZO_LICENCIA="$clave"
-                echo "${C_VERDE}Clave guardada (drz_…${clave: -4}).${C_FIN}"
-                echo "Si tienes Claude Code abierto, ciérralo y vuelve a abrirlo desde una terminal nueva para que vea la clave."
-                return 0 ;;
-        esac
-        echo "${C_AMARILLO}Eso no parece una clave de Drazo: empieza por drz_. Prueba otra vez.${C_FIN}"
+        [ -z "$clave" ] && return 0
+        case "$clave" in drz_????????*) printf '%s' "$clave"; return 0 ;; esac
+        echo "Eso no parece una clave de Drazo: empieza por drz_. Prueba otra vez." > /dev/tty
     done
 }
 
-instalar_plugin() {
-    local c; c="$(ruta_claude)"
-    if [ -z "$c" ]; then echo "${C_ROJO}Falta Claude Code: no puedo instalar el plugin.${C_FIN}"; return 1; fi
-    "$c" plugin marketplace add "${MARKETPLACE:-$REPO_DRAZO}" && "$c" plugin install "$ID_PLUGIN" --scope user
+# Marketplace, plugin y licencia en los ajustes de Claude (settings.json), con copia de seguridad.
+instalar_registrar() {
+    local clave="$LICENCIA"
+    [ -z "$clave" ] && [ "$SI" != "1" ] && clave="$(pedir_licencia)"
+    set -- registrar
+    [ -n "$clave" ] && set -- "$@" --licencia "$clave"
+    [ -n "$MARKETPLACE" ] && set -- "$@" --fuente-local "$MARKETPLACE"
+    ajustes_claude "$@"
 }
 
-actualizar_plugin() {
-    local c; c="$(ruta_claude)"
-    "$c" plugin marketplace update drazo
-    "$c" plugin update "$ID_PLUGIN"
-}
-
-# Pregunta de cada paso que se instala; vacío = no se instala desde aquí.
-texto_accion() {
+texto_paso() {
     case "$1" in
-        brew) echo "Preparo Homebrew: lo instalo si falta y lo dejo cargado en la terminal (lo necesitan los demás pasos)" ;;
-        git) echo "Instalo Git (Claude Code lo usa para traer el plugin de Drazo)" ;;
-        node) echo "Instalo Node.js" ;;
-        claude) echo "Instalo Claude Code con el instalador oficial" ;;
-        ffmpeg) echo "Instalo ffmpeg-full (con libx264 y zscale)" ;;
-        python) echo "Instalo Python 3.12" ;;
-        venv) echo "Creo el entorno de Python de Drazo (unos 1-2 GB en $DRAZO_VENV)" ;;
-        modelo) echo "Descargo el modelo de transcripción large-v3-turbo (unos 1,6 GB), para que la primera transcripción no se corte" ;;
-        playwright) echo "Instalo playwright-core solo para Drazo (en $DRAZO_NODE)" ;;
+        git) echo "Instalo git (herramientas de desarrollo de Apple; Claude lo usa para descargar Drazo)" ;;
+        node) echo "Instalo Node.js $VERSION_NODE en la carpeta de Drazo" ;;
+        claude) echo "Instalo Claude Code (la orden claude)" ;;
+        ffmpeg) echo "Instalo ffmpeg completo (con libx264 y zscale) en la carpeta de Drazo" ;;
+        python) echo "Instalo uv, que trae el Python de Drazo" ;;
+        venv) echo "Creo el entorno de Python de Drazo (unos 1-2 GB; tarda varios minutos)" ;;
+        modelo) echo "Descargo el modelo de transcripción large-v3-turbo (unos 1,6 GB)" ;;
+        playwright) echo "Instalo playwright-core solo para Drazo" ;;
         chrome) echo "Instalo Google Chrome" ;;
         navegador) echo "Descargo el navegador de HyperFrames" ;;
-        skills) echo "Instalo las skills públicas de HyperFrames en Claude Code" ;;
+        skills) echo "Instalo las skills públicas de HyperFrames en Claude" ;;
         fuentes) echo "Instalo las fuentes Anton, Caveat, Poppins, Inter y JetBrains Mono para tu usuario" ;;
-        telemetria) echo "Apago la telemetría de HyperFrames (HYPERFRAMES_NO_TELEMETRY=1)" ;;
+        telemetria) echo "Apago la telemetría de HyperFrames" ;;
+        tesseract) echo "Instalo Tesseract $VERSION_TESSERACT (opcional, de Mirage)" ;;
+        registrar) echo "Registro Drazo en Claude y guardo la clave de licencia" ;;
     esac
 }
 
-estado_de() { local v="ESTADO_$1"; printf '%s' "${!v}"; }
+PASOS_VALIDOS="git node claude ffmpeg python venv modelo playwright chrome navegador skills fuentes telemetria tesseract registrar"
 
-CODIGO=1
+comprobar_paso() {
+    case "$1" in
+        venv) comprobar_venv ;;
+        registrar) comprobar_registro ;;
+        *) "comprobar_$1" ;;
+    esac
+}
+
+# Un paso está hecho si no falta nada; Tesseract (opcional) solo si está del todo bien.
+esta_hecho() {
+    if [ "$1" = "tesseract" ]; then [ "$RES_ESTADO" = "ok" ]; else [ "$RES_ESTADO" != "falta" ]; fi
+}
+
 principal() {
-    local id texto plan="" linea
+    local id v lista="" codigo hechos="" ya="" fallan="" omitidos="" pendientes="" uso_malo=0
     echo ""
     echo "${C_CIAN}Drazo Pro · instalador para macOS${C_FIN}"
-    echo "Para usar Drazo Pro necesitas Claude Code con una suscripción a Claude Max 5x o superior."
+    echo "Drazo Pro funciona con Claude (app de escritorio o Claude Code) y una suscripción a Claude Max 5x o superior."
     [ "$SOLO_COMPROBAR" = "1" ] && echo "${C_AMARILLO}Modo solo comprobar: no se instala ni se cambia nada.${C_FIN}"
     echo ""
-    cargar_brew
+    cargar_rutas_drazo
     for id in $COMPROBACIONES_DRAZO; do
         comprobar "$id"
         printf -v "ESTADO_$id" '%s' "$RES_ESTADO"
-        printf -v "NOMBRE_$id" '%s' "$RES_NOMBRE"
     done
+    if [ "$ESTADO_sistema" = "falta" ]; then echo "${C_ROJO}Este equipo no cumple el mínimo para Drazo.${C_FIN}"; CODIGO=3; return; fi
+    comprobar_registro
+    ESTADO_registrar="$RES_ESTADO"
+
+    if [ -n "$PASOS" ]; then
+        lista="$(printf '%s' "$PASOS" | tr ',' ' ')"
+        for id in $lista; do
+            case " $PASOS_VALIDOS " in *" $id "*) ;; *) echo "Pasos desconocidos: $id. Válidos: $PASOS_VALIDOS"; CODIGO=2; return ;; esac
+        done
+    else
+        for id in $PASOS_VALIDOS; do
+            case "$id" in tesseract|registrar) continue ;; esac
+            v="ESTADO_$id"
+            [ "${!v}" = "falta" ] && lista="$lista $id"
+        done
+        [ "$SI" != "1" ] && [ "$ESTADO_tesseract" != "ok" ] && lista="$lista tesseract"
+        if [ -n "$LICENCIA" ] || [ "$ESTADO_registrar" = "falta" ]; then lista="$lista registrar"; fi
+    fi
 
     if [ "$SOLO_COMPROBAR" = "1" ]; then
-        for id in $COMPROBACIONES_DRAZO; do
-            texto="$(texto_accion "$id")"
-            [ "$(estado_de "$id")" = "falta" ] && [ -n "$texto" ] && plan="$plan$texto"$'\n'
-        done
-        [ "$(estado_de tesseract)" != "ok" ] && plan="${plan}Te ofrezco Tesseract $VERSION_TESSERACT (opcional, con las condiciones de Mirage)"$'\n'
-        [ "$(estado_de licencia)" != "ok" ] && plan="${plan}Te pido la clave de licencia y la guardo en el entorno de Drazo (DRAZO_LICENCIA)"$'\n'
-        if [ "$(estado_de plugin)" = "ok" ]; then plan="${plan}Te ofrezco actualizar el plugin de Drazo"$'\n'
-        else plan="${plan}Añado el marketplace de Drazo (${MARKETPLACE:-$REPO_DRAZO}) e instalo el plugin $ID_PLUGIN"$'\n'; fi
-        echo ""
-        echo "${C_CIAN}Esto haría el instalador, pidiendo permiso en cada paso:${C_FIN}"
-        printf '%s' "$plan" | while IFS= read -r linea; do [ -n "$linea" ] && echo "  - $linea"; done
+        if [ -n "$lista" ]; then
+            echo ""
+            echo "${C_CIAN}Esto haría el instalador, paso a paso:${C_FIN}"
+            for id in $lista; do echo "  - [$id] $(texto_paso "$id")"; done
+        fi
         mostrar_arreglos
         if hay_faltas_obligatorias; then CODIGO=1; else CODIGO=0; fi
         return
     fi
 
-    if [ "$(estado_de sistema)" = "falta" ]; then echo "${C_ROJO}Este equipo no cumple el mínimo para Drazo.${C_FIN}"; return; fi
-
-    for id in $COMPROBACIONES_DRAZO; do
-        texto="$(texto_accion "$id")"
-        [ "$(estado_de "$id")" = "falta" ] && [ -n "$texto" ] || continue
-        local v="NOMBRE_$id"
-        paso "${!v}"
-        if preguntar "¿$texto?"; then
-            "instalar_$id"
-            "comprobar_$id"
-            mostrar_resultado
+    for id in $lista; do
+        echo ""
+        echo "${C_CIAN}== [$id] $(texto_paso "$id")${C_FIN}"
+        comprobar_paso "$id"
+        if esta_hecho "$id" && ! { [ "$id" = "registrar" ] && [ -n "$LICENCIA" ]; }; then
+            echo "-> [$id] ya estaba: $RES_DETALLE"; ya="$ya,$id"; continue
         fi
+        if [ "$id" = "tesseract" ]; then
+            echo "Tesseract es de Mirage, no de Drazo. Al instalarlo se aceptan sus condiciones (uso propio):"
+            echo "  https://github.com/mirage-hq/Tesseract/blob/main/TERMS.md y https://mirage.app/legal/tesseract-terms"
+            if ! preguntar "¿Aceptas sus condiciones e instalo Tesseract?" n; then echo "-> [$id] omitido"; omitidos="$omitidos,$id"; continue; fi
+        elif ! preguntar "¿$(texto_paso "$id")?"; then
+            echo "-> [$id] omitido"; omitidos="$omitidos,$id"; continue
+        fi
+        if [ "$id" = "registrar" ] && [ "$SI" = "1" ] && [ -z "$LICENCIA" ]; then
+            estado_ajustes
+            if [ "${AJ_licencia:-}" != "si" ]; then
+                echo "-> [$id] falta: no hay clave de licencia; pásala con --licencia drz_..."; fallan="$fallan,$id"; uso_malo=1; continue
+            fi
+        fi
+        "instalar_$id"; codigo=$?
+        if [ "$codigo" = "4" ]; then echo "-> [$id] pendiente: esperando a la ventana de Apple; repite este paso cuando termine"; pendientes="$pendientes,$id"; continue; fi
+        comprobar_paso "$id"
+        if esta_hecho "$id"; then echo "-> [$id] ok: $RES_DETALLE"; hechos="$hechos,$id"
+        elif [ "$codigo" != "0" ]; then echo "-> [$id] error: el paso terminó con el código $codigo. $RES_ARREGLO"; fallan="$fallan,$id"
+        else echo "-> [$id] falta: $RES_DETALLE. $RES_ARREGLO"; fallan="$fallan,$id"; fi
     done
-
-    if [ "$(estado_de tesseract)" != "ok" ]; then paso "Tesseract $VERSION_TESSERACT (opcional)"; instalar_tesseract; fi
-
-    paso "Clave de licencia de Drazo"
-    comprobar_licencia
-    if [ "$RES_ESTADO" = "ok" ]; then
-        preguntar "Ya tienes una clave guardada ($RES_DETALLE). ¿Quieres cambiarla?" n && pedir_licencia
-    else
-        pedir_licencia
+    echo ""
+    echo "RESUMEN: hechos=${hechos#,}; ya estaban=${ya#,}; fallan=${fallan#,}; omitidos=${omitidos#,}; pendientes=${pendientes#,}"
+    case ",$hechos," in
+        *,git,*|*,node,*|*,ffmpeg,*|*,python,*|*,chrome,*|*,claude,*|*,registrar,*|*,telemetria,*)
+            echo "${C_CIAN}Para que Claude vea lo instalado y a Drazo: cierra la app de Claude (o Claude Code) y vuelve a abrirla.${C_FIN}" ;;
+    esac
+    if [ "$SI" != "1" ]; then
+        echo ""
+        echo "${C_CIAN}== Comprobación final${C_FIN}"
+        bash "$PLUGIN/scripts/drazo-doctor.sh"
+        echo "${C_CIAN}Después escribe «Hola Drazo» en Claude: te hará unas preguntas para conocer tu estilo. Si quieres probar ya, di «edítamelo viral».${C_FIN}"
     fi
-
-    paso "Plugin de Drazo para Claude Code"
-    if [ "$(estado_de plugin)" = "ok" ]; then
-        preguntar "¿Actualizo el plugin de Drazo a su última versión?" && actualizar_plugin
-    else
-        preguntar "¿Añado el marketplace de Drazo e instalo el plugin?" && instalar_plugin
-    fi
-
-    paso "Comprobación final"
-    bash "$PLUGIN/scripts/drazo-doctor.sh"
-    CODIGO=$?
-    echo "${C_CIAN}Siguiente paso: cierra Claude Code si lo tienes abierto y abre una terminal nueva: así Claude Code y su terminal Bash ven la clave DRAZO_LICENCIA y las rutas nuevas.${C_FIN}"
-    [ "$(estado_de cuenta)" = "ok" ] || echo "${C_CIAN}Después escribe claude y entra con tu cuenta de Claude Max (5x o superior).${C_FIN}"
-    echo "${C_CIAN}Para tu primer vídeo: abre Claude Code en la carpeta del vídeo y dile «edítame el vídeo».${C_FIN}"
+    if [ "$uso_malo" = "1" ]; then CODIGO=2
+    elif [ -n "$fallan" ]; then CODIGO=1
+    elif [ -n "$pendientes" ]; then CODIGO=4
+    else CODIGO=0; fi
 }
 
 preparar_plugin || exit 1
 . "$PLUGIN/scripts/drazo-comun.sh"
+if [ "$DOCTOR" = "1" ]; then bash "$PLUGIN/scripts/drazo-doctor.sh"; exit $?; fi
 principal
 exit "$CODIGO"

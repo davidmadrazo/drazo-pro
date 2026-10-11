@@ -8,6 +8,7 @@ $DrazoVenv        = Join-Path $DrazoDatos 'venv'
 $DrazoPython      = Join-Path $DrazoVenv 'Scripts\python.exe'
 $DrazoNode        = Join-Path $DrazoDatos 'node'
 $RequisitosPython = Join-Path $DrazoScripts 'requisitos-python.txt'
+$AjustesScript    = Join-Path $DrazoScripts 'ajustes-claude.mjs'
 $ListaFuentes     = Join-Path $DrazoScripts 'fuentes.txt'
 $CarpetaFuentes   = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\Fonts'
 $VersionTesseract = '0.2.0'
@@ -77,6 +78,31 @@ function Ruta-Claude {
     $nativo = Join-Path $env:USERPROFILE '.local\bin\claude.exe'
     if (Test-Path -LiteralPath $nativo) { return $nativo }
     $null
+}
+
+# App de escritorio de Claude: paquete MSIX (Microsoft Store o instalador nuevo) o la instalación antigua.
+function Ruta-AppEscritorio {
+    $p = Get-AppxPackage -Name 'Claude' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($p) { return $p.InstallLocation }
+    foreach ($r in (Join-Path $env:LOCALAPPDATA 'AnthropicClaude\claude.exe'), (Join-Path $env:LOCALAPPDATA 'Programs\Claude\Claude.exe')) {
+        if (Test-Path -LiteralPath $r) { return $r }
+    }
+    $null
+}
+
+# Registro de Drazo y licencia en los ajustes de Claude (settings.json), leídos con ajustes-claude.mjs.
+$script:EstadoAjustes = $null
+function Estado-Ajustes([switch]$Renovar) {
+    if ($script:EstadoAjustes -and -not $Renovar) { return $script:EstadoAjustes }
+    $node = Buscar-Comando 'node'
+    if (-not $node) { return $null }
+    $e = @{}
+    foreach ($l in (Ejecutar $node @($AjustesScript, 'estado')).Lineas) {
+        $i = $l.IndexOf('=')
+        if ($i -gt 0) { $e[$l.Substring(0, $i)] = $l.Substring($i + 1) }
+    }
+    $script:EstadoAjustes = $e
+    $e
 }
 
 # La terminal Bash de Claude Code en Windows es Git Bash (no el bash.exe de WSL de System32).
@@ -213,16 +239,20 @@ function Comprobar-Node {
 }
 
 function Comprobar-Claude {
-    $exe = Ruta-Claude
-    if (-not $exe) { return Nuevo-Resultado 'claude' 'Claude Code' 'falta' 'no está' 'irm https://claude.ai/install.ps1 | iex' }
-    $v = ((Ejecutar $exe @('--version')).Lineas | Select-Object -First 1) -replace '\s*\(Claude Code\)', ''
-    Nuevo-Resultado 'claude' 'Claude Code' 'ok' $v
+    $nombre = 'Claude (app de escritorio o Claude Code)'
+    $partes = @()
+    if (Ruta-AppEscritorio) { $partes += 'app de escritorio' }
+    $cli = Ruta-Claude
+    if ($cli) { $partes += 'Claude Code ' + (((Ejecutar $cli @('--version')).Lineas | Select-Object -First 1) -replace '\s*\(Claude Code\)', '') }
+    if ($partes.Count) { return Nuevo-Resultado 'claude' $nombre 'ok' ($partes -join ' y ') }
+    if ($env:CLAUDECODE -eq '1') { return Nuevo-Resultado 'claude' $nombre 'ok' 'esta sesión de Claude Code' }
+    Nuevo-Resultado 'claude' $nombre 'falta' 'no está' 'Instala la app de escritorio de Claude (claude.com/download) y entra con tu cuenta de Claude Max.'
 }
 
 function Comprobar-Cuenta {
     $nombre = 'Cuenta de Claude Max (5x o superior)'
     $exe = Ruta-Claude
-    if (-not $exe) { return Nuevo-Resultado 'cuenta' $nombre 'falta' 'sin Claude Code' 'Instala Claude Code y entra con tu cuenta de Claude Max.' }
+    if (-not $exe) { return Nuevo-Resultado 'cuenta' $nombre 'aviso' 'sin la orden claude no se puede mirar el plan' 'Comprueba en claude.ai que tu plan es Max 5x o superior.' }
     $estado = Json-DeTexto (Ejecutar $exe @('auth', 'status', '--json')).Texto
     if (-not $estado) { return Nuevo-Resultado 'cuenta' $nombre 'aviso' 'no se pudo leer' 'Abre una terminal, escribe claude y entra con tu cuenta de Claude Max.' }
     if (-not $estado.loggedIn) { return Nuevo-Resultado 'cuenta' $nombre 'falta' 'sin sesión iniciada' 'Abre una terminal, escribe claude y entra con tu cuenta de Claude Max (5x o superior).' }
@@ -322,12 +352,13 @@ function Comprobar-Fuentes {
     Nuevo-Resultado 'fuentes' $nombre 'ok' 'Anton, Caveat, Poppins, Inter y JetBrains Mono'
 }
 
+# Vale cualquiera de las dos: el env de los ajustes de Claude (lo que pone el instalador) o una variable de usuario.
 function Comprobar-Telemetria {
     $nombre = 'Telemetría de HyperFrames apagada'
-    $v = [Environment]::GetEnvironmentVariable('HYPERFRAMES_NO_TELEMETRY', 'User')
-    if (-not $v) { $v = $env:HYPERFRAMES_NO_TELEMETRY }
-    if ($v -eq '1') { return Nuevo-Resultado 'telemetria' $nombre 'ok' 'HYPERFRAMES_NO_TELEMETRY=1' }
-    Nuevo-Resultado 'telemetria' $nombre 'falta' 'sin HYPERFRAMES_NO_TELEMETRY=1' 'La pone el instalador de Drazo (variable de usuario).'
+    $e = Estado-Ajustes
+    if ($e -and $e['telemetria'] -eq 'si') { return Nuevo-Resultado 'telemetria' $nombre 'ok' 'HYPERFRAMES_NO_TELEMETRY=1 en los ajustes de Claude' }
+    if ([Environment]::GetEnvironmentVariable('HYPERFRAMES_NO_TELEMETRY', 'User') -eq '1' -or $env:HYPERFRAMES_NO_TELEMETRY -eq '1') { return Nuevo-Resultado 'telemetria' $nombre 'ok' 'HYPERFRAMES_NO_TELEMETRY=1' }
+    Nuevo-Resultado 'telemetria' $nombre 'falta' 'sin HYPERFRAMES_NO_TELEMETRY=1' 'La apaga el instalador de Drazo (en los ajustes de Claude).'
 }
 
 function Comprobar-Tesseract {
@@ -343,44 +374,41 @@ function Comprobar-Tesseract {
     Nuevo-Resultado 'tesseract' $nombre 'ok' "tsrct $v y sus skills" -Opcional
 }
 
+# La clave vive en los ajustes de Claude (pluginConfigs), que es de donde la toma el plugin.
 function Comprobar-Licencia {
-    $nombre = 'Clave de licencia (DRAZO_LICENCIA)'
-    $guardada = [Environment]::GetEnvironmentVariable('DRAZO_LICENCIA', 'User')
-    $clave = if ($env:DRAZO_LICENCIA) { $env:DRAZO_LICENCIA } else { $guardada }
-    if (-not $clave) { return Nuevo-Resultado 'licencia' $nombre 'falta' 'no está' 'Vuelve a ejecutar el instalador de Drazo y pega tu clave (empieza por drz_).' }
-    $visible = 'drz_…' + $clave.Substring([Math]::Max(0, $clave.Length - 4))
-    if (-not $clave.StartsWith('drz_')) { return Nuevo-Resultado 'licencia' $nombre 'aviso' 'no empieza por drz_' 'Revisa que pegaste la clave completa de Drazo.' }
-    if (-not $env:DRAZO_LICENCIA) { return Nuevo-Resultado 'licencia' $nombre 'aviso' "$visible guardada, pero esta ventana no la ve" 'Cierra y abre la terminal y Claude Code para que la lean.' }
-    Nuevo-Resultado 'licencia' $nombre 'ok' $visible
+    $nombre = 'Clave de licencia en Claude'
+    $e = Estado-Ajustes
+    if (-not $e) { return Nuevo-Resultado 'licencia' $nombre 'falta' 'sin Node.js no se pueden leer los ajustes de Claude' 'Instala Node.js con el instalador de Drazo.' }
+    if ($e['ajustes'] -eq 'json-invalido') { return Nuevo-Resultado 'licencia' $nombre 'falta' 'los ajustes de Claude no se pueden leer' "Revisa el fichero: $($e['detalle'])" }
+    if ($e['licencia'] -ne 'si') { return Nuevo-Resultado 'licencia' $nombre 'falta' 'no está guardada' 'Guárdala con el paso «registrar» del instalador de Drazo y tu clave drz_.' }
+    if ($e['licencia_formato'] -ne 'si') { return Nuevo-Resultado 'licencia' $nombre 'aviso' 'no empieza por drz_' 'Revisa que guardaste la clave completa de Drazo.' }
+    Nuevo-Resultado 'licencia' $nombre 'ok' $e['licencia_tapada']
 }
 
-# Los motores de Drazo se descargan con un comando bash (curl ... | node ...) que lee $DRAZO_LICENCIA.
-# Sin comillas dobles en el comando: PowerShell 5.1 las rompe al pasarlas a un programa.
+# Los motores de Drazo se instalan con una orden bash (curl ... | node ...) en la terminal Bash de Claude Code.
+# Sin comillas dobles en la orden: PowerShell 5.1 las rompe al pasarlas a un programa.
 function Comprobar-Bash {
     $nombre = 'Terminal Bash de Claude Code'
     $bash = Ruta-GitBash
     if (-not $bash) { return Nuevo-Resultado 'bash' $nombre 'falta' 'no hay Git Bash' 'Claude Code usa Git Bash para instalar los motores de Drazo: winget install --id Git.Git -e' }
-    $r = Ejecutar $bash @('-c', 'command -v curl >/dev/null && echo curl=si || echo curl=no; command -v node >/dev/null && echo node=si || echo node=no; [ ${#DRAZO_LICENCIA} -gt 0 ] && echo clave=si || echo clave=no')
+    $r = Ejecutar $bash @('-c', 'command -v curl >/dev/null && echo curl=si || echo curl=no; command -v node >/dev/null && echo node=si || echo node=no')
     $faltan = @()
     if ($r.Texto -notmatch 'curl=si') { $faltan += 'curl' }
     if ($r.Texto -notmatch 'node=si') { $faltan += 'node' }
-    if ($faltan.Count) { return Nuevo-Resultado 'bash' $nombre 'falta' "Git Bash no encuentra: $($faltan -join ', ')" 'Vuelve a ejecutar el instalador de Drazo (Git y Node.js) y abre una terminal nueva.' }
-    if ($r.Texto -notmatch 'clave=si') {
-        $arreglo = if ([Environment]::GetEnvironmentVariable('DRAZO_LICENCIA', 'User')) { 'La clave está guardada, pero esta sesión no la ve: cierra Claude Code y la terminal, y vuelve a abrirlos.' } else { 'Pon tu clave con el instalador de Drazo y después cierra y vuelve a abrir Claude Code.' }
-        return Nuevo-Resultado 'bash' $nombre 'falta' 'curl y node sí, pero la clave DRAZO_LICENCIA no se ve desde bash' $arreglo
-    }
-    Nuevo-Resultado 'bash' $nombre 'ok' 'curl, node y la clave DRAZO_LICENCIA visibles en Git Bash'
+    if ($faltan.Count) { return Nuevo-Resultado 'bash' $nombre 'falta' "Git Bash no encuentra: $($faltan -join ', ')" 'Instala lo que falta con el instalador de Drazo y cierra y vuelve a abrir la app de Claude.' }
+    Nuevo-Resultado 'bash' $nombre 'ok' 'curl y node visibles en Git Bash'
 }
 
+# Registrado = marketplace y plugin en los ajustes de Claude. La app lo descarga al abrirse de nuevo.
 function Comprobar-Plugin {
-    $nombre = 'Plugin drazo en Claude Code'
-    $exe = Ruta-Claude
-    if (-not $exe) { return Nuevo-Resultado 'plugin' $nombre 'falta' 'sin Claude Code' 'Instala Claude Code y vuelve a ejecutar el instalador de Drazo.' }
-    $p = @(Json-DeTexto (Ejecutar $exe @('plugin', 'list', '--json')).Texto) | Where-Object { $_.id -eq $IdPlugin } | Select-Object -First 1
-    if (-not $p) { return Nuevo-Resultado 'plugin' $nombre 'falta' 'no instalado' 'Lo instala el instalador de Drazo (claude plugin install drazo@drazo).' }
-    if ($p.errors) { return Nuevo-Resultado 'plugin' $nombre 'falta' ("con errores: " + ($p.errors -join '; ')) 'Vuelve a ejecutar el instalador de Drazo; si sigue, escribe al soporte.' }
-    if (-not $p.enabled) { return Nuevo-Resultado 'plugin' $nombre 'falta' "$($p.version) desactivado" 'Actívalo: claude plugin enable drazo@drazo' }
-    Nuevo-Resultado 'plugin' $nombre 'ok' "versión $($p.version), ámbito $($p.scope)"
+    $nombre = 'Drazo registrado en Claude'
+    $e = Estado-Ajustes
+    if (-not $e) { return Nuevo-Resultado 'plugin' $nombre 'falta' 'sin Node.js no se pueden leer los ajustes de Claude' 'Instala Node.js con el instalador de Drazo.' }
+    if ($e['ajustes'] -eq 'json-invalido') { return Nuevo-Resultado 'plugin' $nombre 'falta' 'los ajustes de Claude no se pueden leer' "Revisa el fichero: $($e['detalle'])" }
+    if ($e['marketplace'] -ne 'si' -or $e['activado'] -ne 'si') { return Nuevo-Resultado 'plugin' $nombre 'falta' 'no está registrado' 'Regístralo con el paso «registrar» del instalador de Drazo.' }
+    if ($e['descargado'] -ne 'si') { return Nuevo-Resultado 'plugin' $nombre 'aviso' "registrado ($($e['fuente'])), aún sin descargar" 'Cierra la app de Claude y vuelve a abrirla: Drazo se descarga al arrancar.' }
+    $detalle = if ($e['version']) { "registrado y descargado (versión $($e['version']))" } else { "registrado, cargado desde $($e['fuente'])" }
+    Nuevo-Resultado 'plugin' $nombre 'ok' $detalle
 }
 
 function Comprobar-Disco {

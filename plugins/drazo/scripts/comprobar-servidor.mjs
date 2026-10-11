@@ -1,9 +1,11 @@
-// Comprueba que el servidor de Drazo responde a drazo_estado con la licencia de este equipo.
-// Usa la misma URL que el plugin (../.mcp.json). Salida: una línea de resumen y, si hay, el detalle.
+// Comprueba que el servidor de Drazo responde a drazo_estado con la licencia guardada en Claude Code
+// (pluginConfigs de settings.json, lo mismo que usa el plugin) y la misma URL que el plugin (../.mcp.json).
+// Salida: una línea de resumen y, si hay, el detalle. La clave nunca se imprime.
 // Códigos: 0 responde bien · 1 responde pero rechaza (licencia u otro error) · 2 no disponible · 3 sin clave.
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { leerAjustes, licenciaGuardada } from "./ajustes-claude.mjs"
 
 const URL_POR_DEFECTO = "https://drazo.vercel.app/api/mcp"
 const HERRAMIENTAS = [
@@ -55,7 +57,9 @@ function textoDeError(cuerpo, texto) {
 }
 
 const url = urlDelPlugin()
-const clave = (process.env.DRAZO_LICENCIA || "").trim()
+let clave = ""
+let errorAjustes = ""
+try { clave = licenciaGuardada(leerAjustes()) } catch (err) { errorAjustes = err.message }
 let sesion = null
 let siguienteId = 1
 
@@ -98,7 +102,8 @@ function resultado(r, paso) {
 }
 
 async function principal() {
-  if (!clave) throw new Fin(3, "No hay clave de licencia (variable DRAZO_LICENCIA): no se puede probar el servidor.")
+  if (errorAjustes) throw new Fin(3, "No se pueden leer los ajustes de Claude Code: no se puede probar el servidor.", errorAjustes)
+  if (!clave) throw new Fin(3, "No hay clave de licencia guardada en Claude Code: no se puede probar el servidor.")
   const inicio = resultado(await llamar("initialize", {
     protocolVersion: PROTOCOLO,
     capabilities: {},

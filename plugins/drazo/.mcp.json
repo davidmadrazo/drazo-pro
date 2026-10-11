@@ -4,7 +4,7 @@
       "type": "http",
       "url": "https://drazo.vercel.app/api/mcp",
       "headers": {
-        "Authorization": "Bearer ${DRAZO_LICENCIA}"
+        "Authorization": "Bearer ${user_config.licencia}"
       },
       "timeout": 300000
     }

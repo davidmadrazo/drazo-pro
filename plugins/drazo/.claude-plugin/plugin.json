@@ -1,8 +1,8 @@
 {
   "name": "drazo",
   "displayName": "Drazo Pro",
-  "version": "0.1.0",
-  "description": "Editor de vídeo Drazo Pro para Claude Code: la skill que arranca la edición y la conexión con el servidor de Drazo usando tu clave de licencia (DRAZO_LICENCIA).",
+  "version": "0.2.0",
+  "description": "Editor de vídeo Drazo Pro para Claude Code: la skill que arranca la edición y la conexión con el servidor de Drazo usando tu clave de licencia.",
   "author": {
     "name": "ProfimaxIA",
     "email": "davidmadrazo@profimaxia.com",
@@ -10,5 +10,13 @@
   },
   "homepage": "https://profimaxia.com",
   "repository": "https://github.com/davidmadrazo/drazo-pro",
-  "keywords": ["video", "edicion", "reels", "hyperframes", "drazo"]
+  "keywords": ["video", "edicion", "reels", "hyperframes", "drazo"],
+  "userConfig": {
+    "licencia": {
+      "type": "string",
+      "title": "Clave de licencia de Drazo",
+      "description": "La clave de tu suscripción a Drazo Pro. Empieza por drz_ y te la enviamos al darte de alta.",
+      "required": true
+    }
+  }
 }

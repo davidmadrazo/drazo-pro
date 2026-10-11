@@ -1,16 +1,26 @@
 ﻿# Instalador de Drazo Pro para Windows 10 y 11.
-# Comprueba cada requisito y, si falta, lo instala pidiendo permiso en cada paso. Al final pasa el doctor.
+# Comprueba cada requisito e instala lo que falte. Normalmente lo ejecuta Claude siguiendo INSTALAR.md,
+# después de pedir permiso en el chat; también sirve a mano desde PowerShell.
 # Uso:
-#   powershell -NoProfile -ExecutionPolicy Bypass -File instalar.ps1                  instala lo que falte
-#   powershell -NoProfile -ExecutionPolicy Bypass -File instalar.ps1 -SoloComprobar   solo mira, no cambia nada
-#   ... -Marketplace <ruta o repo>   otra fuente para el marketplace (para pruebas)
+#   powershell -NoProfile -ExecutionPolicy Bypass -File instalar.ps1 -SoloComprobar     solo mira, no cambia nada
+#   ... -Doctor                                         pasa el doctor completo (también prueba el servidor)
+#   ... -Si [-Pasos git,node,...] [-Licencia drz_...]   sin preguntas (el permiso ya se pidió en el chat)
+#   ... (sin opciones)                                  pregunta en la terminal antes de cada paso
+#   ... -Marketplace <carpeta del repo>                 registra Drazo desde una carpeta local (pruebas)
+# Pasos: git node claude ffmpeg python venv modelo playwright chrome navegador skills fuentes telemetria tesseract registrar
+# Salida por paso: «== [paso] ...» al empezar y «-> [paso] ok|ya estaba|falta|error: ...» al acabar.
+# Código de salida: 0 todo bien · 1 algún paso no quedó bien · 2 uso incorrecto · 3 equipo no compatible.
 # Este fichero va en UTF-8 con BOM: sin BOM, PowerShell 5.1 rompe las tildes.
 param(
     [switch]$SoloComprobar,
+    [switch]$Doctor,
+    [switch]$Si,
+    [string]$Pasos,
+    [string]$Licencia,
     [string]$Marketplace
 )
 
-# Repo de GitHub con el marketplace y el plugin de Drazo (aún no publicado).
+# Repo de GitHub con el marketplace y el plugin de Drazo.
 $RepoDrazo = 'davidmadrazo/drazo-pro'
 $RamaDrazo = 'main'
 $UrlBaseDrazo = "https://raw.githubusercontent.com/$RepoDrazo/$RamaDrazo"
@@ -22,9 +32,10 @@ $ProgressPreference = 'SilentlyContinue'
 
 $FicherosPlugin = @(
     '.mcp.json', 'scripts/drazo-comun.ps1', 'scripts/drazo-doctor.ps1', 'scripts/comprobar-servidor.mjs',
-    'scripts/comprobar-python.py', 'scripts/requisitos-python.txt', 'scripts/fuentes.txt'
+    'scripts/ajustes-claude.mjs', 'scripts/comprobar-python.py', 'scripts/requisitos-python.txt', 'scripts/fuentes.txt'
 )
 $CarpetaTemporal = $null
+$CodigoSalida = 1
 
 # Desde una copia del repo usa sus ficheros; si el instalador llega suelto, baja los que necesita.
 function Preparar-Plugin {
@@ -43,6 +54,7 @@ function Preparar-Plugin {
 }
 
 function Preguntar([string]$Texto, [switch]$PorDefectoNo) {
+    if ($Si) { return $true }
     $sufijo = if ($PorDefectoNo) { '[s/N]' } else { '[S/n]' }
     while ($true) {
         $r = "$(Read-Host "$Texto $sufijo")".Trim().ToLower()
@@ -52,31 +64,25 @@ function Preguntar([string]$Texto, [switch]$PorDefectoNo) {
     }
 }
 
-function Paso([string]$Titulo) {
-    Write-Host ''
-    Write-Host "== $Titulo" -ForegroundColor Cyan
-}
+function Avisar([string]$Texto, [string]$Color = 'Yellow') { Write-Host $Texto -ForegroundColor $Color }
 
 function Instalar-ConWinget([string]$Id, [string]$Nombre) {
-    if (-not (Buscar-Comando 'winget')) {
-        Write-Host "Sin winget no puedo instalar $Nombre. Instálalo a mano y vuelve a ejecutar el instalador." -ForegroundColor Red
-        return
-    }
-    Write-Host "Instalando $Nombre con winget. Windows puede pedirte permiso de administrador."
-    & winget install --id $Id -e --source winget --accept-package-agreements --accept-source-agreements --silent
-    if ($LASTEXITCODE -ne 0) { Write-Host "winget terminó con el código $LASTEXITCODE." -ForegroundColor Yellow }
+    if (-not (Buscar-Comando 'winget')) { throw "sin winget no se puede instalar $Nombre; instala «Instalador de aplicación» desde Microsoft Store" }
+    Write-Host "Instalando $Nombre con winget. Windows puede mostrar una ventana «¿Quieres permitir que esta aplicación haga cambios?»: hay que pulsar «Sí»."
+    & winget install --id $Id -e --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity
+    if ($LASTEXITCODE -ne 0) { Write-Host "winget terminó con el código $LASTEXITCODE." }
     Actualizar-Path
 }
 
 function Instalar-Claude {
-    Write-Host 'Instalando Claude Code con el instalador oficial de Anthropic...'
+    Write-Host 'Instalando Claude Code (la orden claude) con el instalador oficial de Anthropic...'
     & powershell -NoProfile -ExecutionPolicy Bypass -Command 'irm https://claude.ai/install.ps1 | iex'
     Actualizar-Path
 }
 
 function Instalar-Entorno {
     $base = Buscar-PythonBase
-    if (-not $base) { Write-Host 'No hay un Python 3.10 o superior para crear el entorno.' -ForegroundColor Red; return }
+    if (-not $base) { throw 'no hay un Python 3.10 o superior para crear el entorno (paso python)' }
     New-Item -ItemType Directory -Force $DrazoDatos | Out-Null
     $roto = (Test-Path -LiteralPath $DrazoPython) -and ((Ejecutar $DrazoPython @('-c', 'import sys')).Codigo -ne 0)
     if (-not (Test-Path -LiteralPath $DrazoPython) -or $roto) {
@@ -89,26 +95,26 @@ function Instalar-Entorno {
 }
 
 function Descargar-Modelo {
-    if (-not (Test-Path -LiteralPath $DrazoPython)) { Write-Host 'Falta el entorno de Python de Drazo: no puedo descargar el modelo.' -ForegroundColor Red; return }
-    Write-Host 'Descargando el modelo de transcripción large-v3-turbo (unos 1,6 GB; tarda según tu conexión)...'
+    if (-not (Test-Path -LiteralPath $DrazoPython)) { throw 'falta el entorno de Python de Drazo (paso venv)' }
+    Write-Host 'Descargando el modelo de transcripción large-v3-turbo (unos 1,6 GB; tarda según la conexión)...'
     $env:HF_HUB_DISABLE_SYMLINKS_WARNING = '1'
     & $DrazoPython -c "from faster_whisper import download_model; download_model('large-v3-turbo')"
 }
 
 function Instalar-Playwright {
-    if (-not (Buscar-Comando 'npm.cmd')) { Write-Host 'Falta Node.js: no puedo instalar playwright-core.' -ForegroundColor Red; return }
+    if (-not (Buscar-Comando 'npm.cmd')) { throw 'falta Node.js (paso node)' }
     New-Item -ItemType Directory -Force $DrazoNode | Out-Null
     & npm.cmd install --prefix $DrazoNode --no-audit --no-fund playwright-core
 }
 
 function Instalar-NavegadorHF {
-    if (-not (Buscar-Comando 'npx.cmd')) { Write-Host 'Falta Node.js: no puedo preparar el navegador de HyperFrames.' -ForegroundColor Red; return }
+    if (-not (Buscar-Comando 'npx.cmd')) { throw 'falta Node.js (paso node)' }
     $env:HYPERFRAMES_NO_TELEMETRY = '1'
     & npx.cmd --yes hyperframes browser ensure
 }
 
 function Instalar-SkillsHF {
-    if (-not (Buscar-Comando 'npx.cmd')) { Write-Host 'Falta Node.js: no puedo instalar las skills de HyperFrames.' -ForegroundColor Red; return }
+    if (-not (Buscar-Comando 'npx.cmd')) { throw 'falta Node.js (paso node)' }
     & npx.cmd --yes skills add heygen-com/hyperframes -g -a claude-code --skill '*' -y --copy
 }
 
@@ -128,7 +134,7 @@ function Instalar-Fuentes {
             $descarga = Join-Path $tmp $f.Archivo
             Invoke-WebRequest -UseBasicParsing -Uri $f.Url -OutFile $descarga
             if ((Get-FileHash -LiteralPath $descarga -Algorithm SHA256).Hash.ToLower() -ne $f.Sha256) {
-                Write-Host "  $($f.Archivo) no coincide con su huella SHA-256: no se instala." -ForegroundColor Red
+                Write-Host "  $($f.Archivo) no coincide con su huella SHA-256: no se instala."
                 continue
             }
             $destino = Join-Path $CarpetaFuentes $f.Archivo
@@ -139,20 +145,20 @@ function Instalar-Fuentes {
     } finally {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
-    Write-Host 'Las aplicaciones que ya estaban abiertas verán las fuentes al reiniciarse.'
 }
 
-function Poner-Telemetria {
-    [Environment]::SetEnvironmentVariable('HYPERFRAMES_NO_TELEMETRY', '1', 'User')
-    $env:HYPERFRAMES_NO_TELEMETRY = '1'
+function Ajustes-Claude([string[]]$Argumentos) {
+    $node = Buscar-Comando 'node'
+    if (-not $node) { throw 'falta Node.js (paso node)' }
+    & $node $AjustesScript @Argumentos
+    $codigo = $LASTEXITCODE
+    Estado-Ajustes -Renovar | Out-Null
+    if ($codigo -ne 0) { throw "no se pudieron guardar los ajustes de Claude (código $codigo)" }
 }
+
+function Poner-Telemetria { Ajustes-Claude @('telemetria') }
 
 function Instalar-Tesseract {
-    Write-Host 'Tesseract es una herramienta de Mirage, no de Drazo, y es opcional.'
-    Write-Host 'Si lo instalas, aceptas sus condiciones (uso propio):'
-    Write-Host '  https://github.com/mirage-hq/Tesseract/blob/main/TERMS.md'
-    Write-Host '  https://mirage.app/legal/tesseract-terms'
-    if (-not (Preguntar '¿Aceptas sus condiciones e instalo Tesseract?' -PorDefectoNo)) { return }
     $zip = "tesseract-$VersionTesseract-windows-x86_64.zip"
     $tmp = Join-Path $env:TEMP ('drazo-tesseract-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Force $tmp | Out-Null
@@ -171,11 +177,8 @@ function Instalar-Tesseract {
         $v = "" + (Leer-Version (Ejecutar $TsrctRuta @('--version')).Texto)
         if ($v -ne $VersionTesseract) { throw "tsrct no responde con la versión $VersionTesseract (responde «$v»)" }
         if (-not (Buscar-Comando 'npx.cmd')) { throw 'tsrct está instalado, pero falta Node.js para instalar sus skills' }
-        $skills = "https://github.com/mirage-hq/Tesseract/tree/v$VersionTesseract/skills"
         $porSkill = foreach ($s in $SkillsTesseract) { '--skill'; $s }
-        & npx.cmd --yes skills add $skills -g -a claude-code @porSkill -y --copy
-    } catch {
-        Write-Host "No se pudo instalar Tesseract: $($_.Exception.Message)" -ForegroundColor Red
+        & npx.cmd --yes skills add "https://github.com/mirage-hq/Tesseract/tree/v$VersionTesseract/skills" -g -a claude-code @porSkill -y --copy
     } finally {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -186,118 +189,142 @@ function Pedir-Licencia {
         $segura = Read-Host 'Pega tu clave de licencia de Drazo (empieza por drz_) y pulsa Intro' -AsSecureString
         $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($segura)
         try { $clave = "$([Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr))".Trim() } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-        if (-not $clave) { Write-Host 'No has pegado nada. Puedes ponerla más tarde volviendo a ejecutar el instalador.' -ForegroundColor Yellow; return }
-        if ($clave -match '^drz_\S{8,}$') {
-            [Environment]::SetEnvironmentVariable('DRAZO_LICENCIA', $clave, 'User')
-            $env:DRAZO_LICENCIA = $clave
-            Write-Host ("Clave guardada (drz_…{0})." -f $clave.Substring($clave.Length - 4)) -ForegroundColor Green
-            Write-Host 'Si tienes Claude Code abierto, ciérralo y vuelve a abrirlo: así la conexión con Drazo y su terminal Bash ven la clave.'
-            return
-        }
-        Write-Host 'Eso no parece una clave de Drazo: empieza por drz_. Prueba otra vez.' -ForegroundColor Yellow
+        if (-not $clave) { return '' }
+        if ($clave -match '^drz_\S{8,}$') { return $clave }
+        Avisar 'Eso no parece una clave de Drazo: empieza por drz_. Prueba otra vez.'
+    }
+    ''
+}
+
+# Marketplace, plugin y licencia en los ajustes de Claude (settings.json), con copia de seguridad.
+function Registrar-Drazo {
+    $clave = $Licencia
+    if (-not $clave -and -not $Si) { $clave = Pedir-Licencia }
+    $argumentos = @('registrar')
+    if ($clave) { $argumentos += @('--licencia', $clave) }
+    if ($Marketplace) { $argumentos += @('--fuente-local', $Marketplace) }
+    Ajustes-Claude $argumentos
+}
+
+function Comprobar-Registro {
+    $p = Comprobar-Plugin
+    $l = Comprobar-Licencia
+    if ($p.Estado -eq 'falta') { return $p }
+    if ($l.Estado -ne 'ok') { return $l }
+    Nuevo-Resultado 'registrar' 'Drazo registrado con tu licencia' $p.Estado "$($p.Detalle); licencia $($l.Detalle)" $p.Arreglo
+}
+
+function Nuevo-Catalogo {
+    [ordered]@{
+        git        = @{ Comprobar = 'Comprobar-Git'; Hacer = { Instalar-ConWinget 'Git.Git' 'Git' }; Texto = 'Instalo Git (Claude lo usa para descargar Drazo y para su terminal Bash)' }
+        node       = @{ Comprobar = 'Comprobar-Node'; Hacer = { Instalar-ConWinget 'OpenJS.NodeJS.LTS' 'Node.js LTS' }; Texto = 'Instalo Node.js' }
+        claude     = @{ Comprobar = 'Comprobar-Claude'; Hacer = { Instalar-Claude }; Texto = 'Instalo Claude Code (la orden claude)' }
+        ffmpeg     = @{ Comprobar = 'Comprobar-Ffmpeg'; Hacer = { Instalar-ConWinget 'Gyan.FFmpeg' 'ffmpeg' }; Texto = 'Instalo ffmpeg completo (con libx264 y zscale)' }
+        python     = @{ Comprobar = 'Comprobar-Python'; Hacer = { Instalar-ConWinget 'Python.Python.3.12' 'Python 3.12' }; Texto = 'Instalo Python 3.12' }
+        venv       = @{ Comprobar = 'Comprobar-Entorno'; Hacer = { Instalar-Entorno }; Texto = 'Creo el entorno de Python de Drazo (unos 1-2 GB; tarda varios minutos)' }
+        modelo     = @{ Comprobar = 'Comprobar-Modelo'; Hacer = { Descargar-Modelo }; Texto = 'Descargo el modelo de transcripción large-v3-turbo (unos 1,6 GB)' }
+        playwright = @{ Comprobar = 'Comprobar-Playwright'; Hacer = { Instalar-Playwright }; Texto = 'Instalo playwright-core solo para Drazo' }
+        chrome     = @{ Comprobar = 'Comprobar-Chrome'; Hacer = { Instalar-ConWinget 'Google.Chrome' 'Google Chrome' }; Texto = 'Instalo Google Chrome' }
+        navegador  = @{ Comprobar = 'Comprobar-NavegadorHF'; Hacer = { Instalar-NavegadorHF }; Texto = 'Descargo el navegador de HyperFrames' }
+        skills     = @{ Comprobar = 'Comprobar-SkillsHF'; Hacer = { Instalar-SkillsHF }; Texto = 'Instalo las skills públicas de HyperFrames en Claude' }
+        fuentes    = @{ Comprobar = 'Comprobar-Fuentes'; Hacer = { Instalar-Fuentes }; Texto = 'Instalo las fuentes Anton, Caveat, Poppins, Inter y JetBrains Mono para tu usuario' }
+        telemetria = @{ Comprobar = 'Comprobar-Telemetria'; Hacer = { Poner-Telemetria }; Texto = 'Apago la telemetría de HyperFrames' }
+        tesseract  = @{ Comprobar = 'Comprobar-Tesseract'; Hacer = { Instalar-Tesseract }; Texto = "Instalo Tesseract $VersionTesseract (opcional, de Mirage)" }
+        registrar  = @{ Comprobar = 'Comprobar-Registro'; Hacer = { Registrar-Drazo }; Texto = 'Registro Drazo en Claude y guardo la clave de licencia' }
     }
 }
 
-function Instalar-Plugin {
-    $claude = Ruta-Claude
-    if (-not $claude) { Write-Host 'Falta Claude Code: no puedo instalar el plugin.' -ForegroundColor Red; return }
-    $fuente = if ($Marketplace) { $Marketplace } else { $RepoDrazo }
-    & $claude plugin marketplace add $fuente
-    & $claude plugin install $IdPlugin --scope user
-}
-
-function Actualizar-Plugin {
-    $claude = Ruta-Claude
-    if (-not $claude) { Write-Host 'Falta Claude Code: no puedo actualizar el plugin.' -ForegroundColor Red; return }
-    & $claude plugin marketplace update drazo
-    & $claude plugin update $IdPlugin
-}
+# Un paso está hecho si no falta nada; Tesseract (opcional) solo si está del todo bien.
+function Esta-Hecho($Id, $R) { if ($Id -eq 'tesseract') { $R.Estado -eq 'ok' } else { $R.Estado -ne 'falta' } }
 
 function Principal {
-    $acciones = [ordered]@{
-        git        = @{ Texto = 'Instalo Git (Claude Code lo usa para traer el plugin de Drazo)'; Hacer = { Instalar-ConWinget 'Git.Git' 'Git' } }
-        node       = @{ Texto = 'Instalo Node.js LTS'; Hacer = { Instalar-ConWinget 'OpenJS.NodeJS.LTS' 'Node.js LTS' } }
-        claude     = @{ Texto = 'Instalo Claude Code con el instalador oficial'; Hacer = { Instalar-Claude } }
-        ffmpeg     = @{ Texto = 'Instalo ffmpeg completo (con libx264 y zscale)'; Hacer = { Instalar-ConWinget 'Gyan.FFmpeg' 'ffmpeg' } }
-        python     = @{ Texto = 'Instalo Python 3.12'; Hacer = { Instalar-ConWinget 'Python.Python.3.12' 'Python 3.12' } }
-        venv       = @{ Texto = "Creo el entorno de Python de Drazo (unos 1-2 GB en $DrazoVenv)"; Hacer = { Instalar-Entorno } }
-        modelo     = @{ Texto = 'Descargo el modelo de transcripción large-v3-turbo (unos 1,6 GB), para que la primera transcripción no se corte'; Hacer = { Descargar-Modelo } }
-        playwright = @{ Texto = "Instalo playwright-core solo para Drazo (en $DrazoNode)"; Hacer = { Instalar-Playwright } }
-        chrome     = @{ Texto = 'Instalo Google Chrome'; Hacer = { Instalar-ConWinget 'Google.Chrome' 'Google Chrome' } }
-        navegador  = @{ Texto = 'Descargo el navegador de HyperFrames'; Hacer = { Instalar-NavegadorHF } }
-        skills     = @{ Texto = 'Instalo las skills públicas de HyperFrames en Claude Code'; Hacer = { Instalar-SkillsHF } }
-        fuentes    = @{ Texto = 'Instalo las fuentes Anton, Caveat, Poppins, Inter y JetBrains Mono para tu usuario'; Hacer = { Instalar-Fuentes } }
-        telemetria = @{ Texto = 'Apago la telemetría de HyperFrames (HYPERFRAMES_NO_TELEMETRY=1)'; Hacer = { Poner-Telemetria } }
+    # Lo que instaló un paso anterior está en el registro, no en el PATH heredado de la app de Claude.
+    Actualizar-Path
+    if ($Doctor) {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Plugin 'scripts\drazo-doctor.ps1')
+        $script:CodigoSalida = $LASTEXITCODE
+        return
     }
-
+    $catalogo = Nuevo-Catalogo
     Write-Host ''
     Write-Host 'Drazo Pro · instalador para Windows' -ForegroundColor Cyan
-    Write-Host 'Para usar Drazo Pro necesitas Claude Code con una suscripción a Claude Max 5x o superior.'
+    Write-Host 'Drazo Pro funciona con Claude (app de escritorio o Claude Code) y una suscripción a Claude Max 5x o superior.'
     if ($SoloComprobar) { Write-Host 'Modo solo comprobar: no se instala ni se cambia nada.' -ForegroundColor Yellow }
     Write-Host ''
-    $resultados = @()
-    $funcionDe = @{}
-    foreach ($f in $ComprobacionesDrazo) {
-        $r = Ejecutar-Comprobacion $f
-        Mostrar-Resultado $r
-        $resultados += $r
-        $funcionDe[$r.Id] = $f
+    $resultados = @(foreach ($f in $ComprobacionesDrazo) { $r = Ejecutar-Comprobacion $f; Mostrar-Resultado $r; $r })
+    $sistema = $resultados | Where-Object Id -eq 'sistema'
+    if ($sistema.Estado -eq 'falta') { Avisar $sistema.Arreglo 'Red'; $script:CodigoSalida = 3; return }
+    $inicial = @{}
+    foreach ($r in $resultados) { $inicial[$r.Id] = $r }
+    $inicial['registrar'] = Ejecutar-Comprobacion 'Comprobar-Registro'
+
+    if ($Pasos) {
+        $lista = @($Pasos -split '[,\s]+' | Where-Object { $_ })
+        $malos = @($lista | Where-Object { -not $catalogo.Contains($_) })
+        if ($malos.Count) { Avisar "Pasos desconocidos: $($malos -join ', '). Válidos: $(@($catalogo.Keys) -join ' ')" 'Red'; $script:CodigoSalida = 2; return }
+    } else {
+        $lista = @($catalogo.Keys | Where-Object { $_ -notin 'tesseract', 'registrar' -and -not (Esta-Hecho $_ $inicial[$_]) })
+        if (-not $Si -and -not (Esta-Hecho 'tesseract' $inicial['tesseract'])) { $lista += 'tesseract' }
+        if ($Licencia -or -not (Esta-Hecho 'registrar' $inicial['registrar'])) { $lista += 'registrar' }
     }
-    $estado = @{}
-    foreach ($r in $resultados) { $estado[$r.Id] = $r.Estado }
 
     if ($SoloComprobar) {
-        $plan = @($resultados | Where-Object { $_.Estado -eq 'falta' -and $acciones.Contains($_.Id) } | ForEach-Object { $acciones[$_.Id].Texto })
-        if ($estado['tesseract'] -ne 'ok') { $plan += "Te ofrezco Tesseract $VersionTesseract (opcional, con las condiciones de Mirage)" }
-        if ($estado['licencia'] -ne 'ok') { $plan += 'Te pido la clave de licencia y la guardo en la variable de usuario DRAZO_LICENCIA' }
-        $fuente = if ($Marketplace) { $Marketplace } else { $RepoDrazo }
-        if ($estado['plugin'] -eq 'ok') { $plan += 'Te ofrezco actualizar el plugin de Drazo' } else { $plan += "Añado el marketplace de Drazo ($fuente) e instalo el plugin $IdPlugin" }
         Write-Host ''
-        Write-Host 'Esto haría el instalador, pidiendo permiso en cada paso:' -ForegroundColor Cyan
-        foreach ($p in $plan) { Write-Host "  - $p" }
+        if ($lista.Count) {
+            Write-Host 'Esto haría el instalador, paso a paso:' -ForegroundColor Cyan
+            foreach ($id in $lista) { Write-Host "  - [$id] $($catalogo[$id].Texto)" }
+        }
         Mostrar-Arreglos $resultados
         $script:CodigoSalida = [int](@($resultados | Where-Object { $_.Estado -eq 'falta' -and -not $_.Opcional }).Count -gt 0)
         return
     }
+    Ejecutar-Pasos $catalogo $lista
+}
 
-    if ($estado['sistema'] -eq 'falta') { Write-Host ($resultados | Where-Object Id -eq 'sistema').Arreglo -ForegroundColor Red; return }
-    if ($estado['winget'] -eq 'falta') { Paso 'winget'; Write-Host ($resultados | Where-Object Id -eq 'winget').Arreglo -ForegroundColor Yellow }
-
-    foreach ($r in $resultados) {
-        if ($r.Estado -ne 'falta' -or -not $acciones.Contains($r.Id)) { continue }
-        Paso $r.Nombre
-        if (Preguntar "¿$($acciones[$r.Id].Texto)?") {
-            try { & $acciones[$r.Id].Hacer } catch { Write-Host "Este paso ha fallado: $($_.Exception.Message)" -ForegroundColor Red }
-            Mostrar-Resultado (Ejecutar-Comprobacion $funcionDe[$r.Id])
+function Ejecutar-Pasos($Catalogo, $Lista) {
+    $hechos = @(); $yaEstaban = @(); $fallan = @(); $omitidos = @(); $usoMalo = $false
+    foreach ($id in $Lista) {
+        $paso = $Catalogo[$id]
+        Write-Host ''
+        Write-Host "== [$id] $($paso.Texto)" -ForegroundColor Cyan
+        $antes = Ejecutar-Comprobacion $paso.Comprobar
+        $forzar = $id -eq 'registrar' -and $Licencia
+        if ((Esta-Hecho $id $antes) -and -not $forzar) { Write-Host "-> [$id] ya estaba: $($antes.Detalle)"; $yaEstaban += $id; continue }
+        if ($id -eq 'tesseract') {
+            Write-Host 'Tesseract es de Mirage, no de Drazo. Al instalarlo se aceptan sus condiciones (uso propio):'
+            Write-Host '  https://github.com/mirage-hq/Tesseract/blob/main/TERMS.md y https://mirage.app/legal/tesseract-terms'
+            if (-not (Preguntar '¿Aceptas sus condiciones e instalo Tesseract?' -PorDefectoNo)) { Write-Host "-> [$id] omitido"; $omitidos += $id; continue }
+        } elseif (-not (Preguntar "¿$($paso.Texto)?")) { Write-Host "-> [$id] omitido"; $omitidos += $id; continue }
+        $ajustes = Estado-Ajustes
+        if ($id -eq 'registrar' -and $Si -and -not $Licencia -and (-not $ajustes -or $ajustes['licencia'] -ne 'si')) {
+            Write-Host "-> [$id] falta: no hay clave de licencia; pásala con -Licencia drz_..."
+            $fallan += $id; $usoMalo = $true; continue
         }
+        try {
+            & $paso.Hacer
+        } catch {
+            Write-Host "-> [$id] error: $($_.Exception.Message)"
+            $fallan += $id; continue
+        }
+        $despues = Ejecutar-Comprobacion $paso.Comprobar
+        if (Esta-Hecho $id $despues) { Write-Host "-> [$id] ok: $($despues.Detalle)"; $hechos += $id }
+        else { Write-Host "-> [$id] falta: $($despues.Detalle). $($despues.Arreglo)"; $fallan += $id }
     }
-
-    if ($estado['tesseract'] -ne 'ok') {
-        Paso "Tesseract $VersionTesseract (opcional)"
-        Instalar-Tesseract
+    Write-Host ''
+    Write-Host ("RESUMEN: hechos={0}; ya estaban={1}; fallan={2}; omitidos={3}" -f ($hechos -join ','), ($yaEstaban -join ','), ($fallan -join ','), ($omitidos -join ','))
+    if ($hechos | Where-Object { $_ -in 'git', 'node', 'ffmpeg', 'python', 'chrome', 'claude', 'registrar', 'telemetria' }) {
+        Avisar 'Para que Claude vea lo instalado y a Drazo: cierra la app de Claude (o Claude Code) y vuelve a abrirla.' 'Cyan'
     }
-
-    Paso 'Clave de licencia de Drazo'
-    $licencia = $resultados | Where-Object Id -eq 'licencia'
-    if ($licencia.Estado -eq 'ok') {
-        if (Preguntar "Ya tienes una clave guardada ($($licencia.Detalle)). ¿Quieres cambiarla?" -PorDefectoNo) { Pedir-Licencia }
-    } else { Pedir-Licencia }
-
-    Paso 'Plugin de Drazo para Claude Code'
-    if ($estado['plugin'] -eq 'ok') {
-        if (Preguntar '¿Actualizo el plugin de Drazo a su última versión?') { Actualizar-Plugin }
-    } elseif (Preguntar '¿Añado el marketplace de Drazo e instalo el plugin?') { Instalar-Plugin }
-
-    Paso 'Comprobación final'
-    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Plugin 'scripts\drazo-doctor.ps1')
-    $script:CodigoSalida = $LASTEXITCODE
-    Write-Host 'Siguiente paso: cierra esta ventana y Claude Code si lo tienes abierto, y abre una terminal nueva: así Claude Code y su terminal Bash ven la clave DRAZO_LICENCIA y las rutas nuevas.' -ForegroundColor Cyan
-    if ($estado['cuenta'] -ne 'ok') { Write-Host 'Después escribe claude y entra con tu cuenta de Claude Max (5x o superior).' -ForegroundColor Cyan }
-    Write-Host 'Para tu primer vídeo: abre Claude Code en la carpeta del vídeo y dile «edítame el vídeo».' -ForegroundColor Cyan
+    if (-not $Si) {
+        Write-Host ''
+        Write-Host '== Comprobación final' -ForegroundColor Cyan
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Plugin 'scripts\drazo-doctor.ps1')
+        Avisar 'Después escribe «Hola Drazo» en Claude: te hará unas preguntas para conocer tu estilo. Si quieres probar ya, di «edítamelo viral».' 'Cyan'
+    }
+    $script:CodigoSalida = if ($usoMalo) { 2 } elseif ($fallan.Count) { 1 } else { 0 }
 }
 
 # Principal no devuelve nada a propósito: así la salida de winget, pip o npm se ve en pantalla.
-$CodigoSalida = 1
 $Plugin = Preparar-Plugin
 try {
     . (Join-Path $Plugin 'scripts\drazo-comun.ps1')
