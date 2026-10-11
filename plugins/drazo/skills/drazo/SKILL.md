@@ -33,6 +33,8 @@ Con «hola drazo», «empezar con drazo» o «configura mi marca»: llama a `dra
 3. Antes de editar, pide siempre el guion del vídeo.
 4. Llama a `drazo_empezar` y sigue exactamente lo que devuelva: cada fase con `drazo_guia`, los motores con `drazo_motor`, la dirección con `drazo_direccion` y la revisión con `drazo_revisar`.
 
+**Carpetas**: el usuario encuentra sus vídeos editados en la carpeta `videos/` de la carpeta de Drazo (cada versión que le enseñes y el vídeo final); el trabajo de cada vídeo va en `proyectos/<video>/`. Si falta alguna, créala.
+
 **Modo prueba**: si el usuario dice «edítamelo viral», «sin preguntas» o «modo prueba», no hay onboarding: `drazo_onboarding` trae la `ficha_modo_prueba`; guárdala con el nicho que encaje y edita. Cuando `drazo_estado` devuelva `modo_prueba: true`, al entregar el vídeo ofrécele hacer el onboarding.
 
 En cualquier momento el usuario puede pedir «rehaz mi onboarding» (`drazo_onboarding`) o «cambia mis colores» o «cambia mi letra» (`drazo_marca`).

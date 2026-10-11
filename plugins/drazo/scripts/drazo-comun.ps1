@@ -246,20 +246,20 @@ function Comprobar-Claude {
     if ($cli) { $partes += 'Claude Code ' + (((Ejecutar $cli @('--version')).Lineas | Select-Object -First 1) -replace '\s*\(Claude Code\)', '') }
     if ($partes.Count) { return Nuevo-Resultado 'claude' $nombre 'ok' ($partes -join ' y ') }
     if ($env:CLAUDECODE -eq '1') { return Nuevo-Resultado 'claude' $nombre 'ok' 'esta sesión de Claude Code' }
-    Nuevo-Resultado 'claude' $nombre 'falta' 'no está' 'Instala la app de escritorio de Claude (claude.com/download) y entra con tu cuenta de Claude Max.'
+    Nuevo-Resultado 'claude' $nombre 'falta' 'no está' 'Instala la app de escritorio de Claude (claude.com/download) y entra con tu cuenta de Claude.'
 }
 
 function Comprobar-Cuenta {
-    $nombre = 'Cuenta de Claude Max (5x o superior)'
+    $nombre = 'Cuenta de Claude (Max 5x recomendado)'
     $exe = Ruta-Claude
-    if (-not $exe) { return Nuevo-Resultado 'cuenta' $nombre 'aviso' 'sin la orden claude no se puede mirar el plan' 'Comprueba en claude.ai que tu plan es Max 5x o superior.' }
+    if (-not $exe) { return Nuevo-Resultado 'cuenta' $nombre 'aviso' 'sin la orden claude no se puede mirar el plan' 'Lo recomendado es Claude Max 5x; con Pro funciona, pero puede pausarse.' }
     $estado = Json-DeTexto (Ejecutar $exe @('auth', 'status', '--json')).Texto
-    if (-not $estado) { return Nuevo-Resultado 'cuenta' $nombre 'aviso' 'no se pudo leer' 'Abre una terminal, escribe claude y entra con tu cuenta de Claude Max.' }
-    if (-not $estado.loggedIn) { return Nuevo-Resultado 'cuenta' $nombre 'falta' 'sin sesión iniciada' 'Abre una terminal, escribe claude y entra con tu cuenta de Claude Max (5x o superior).' }
+    if (-not $estado) { return Nuevo-Resultado 'cuenta' $nombre 'aviso' 'no se pudo leer' 'Abre una terminal, escribe claude y entra con tu cuenta de Claude.' }
+    if (-not $estado.loggedIn) { return Nuevo-Resultado 'cuenta' $nombre 'falta' 'sin sesión iniciada' 'Abre una terminal, escribe claude y entra con tu cuenta de Claude.' }
     switch ("$($estado.subscriptionType)") {
         'max' { return Nuevo-Resultado 'cuenta' $nombre 'ok' 'sesión iniciada con Claude Max' }
-        'pro' { return Nuevo-Resultado 'cuenta' $nombre 'falta' 'plan Pro' 'Drazo Pro necesita Claude Max 5x o superior: con Pro se queda corto. Cambia de plan en claude.ai.' }
-        default { return Nuevo-Resultado 'cuenta' $nombre 'aviso' "plan «$($estado.subscriptionType)» ($($estado.authMethod))" 'Drazo Pro está pensado para Claude Max 5x o superior.' }
+        'pro' { return Nuevo-Resultado 'cuenta' $nombre 'aviso' 'plan Pro' 'Con Pro funciona, pero editar un vídeo gasta mucho y puede pausarse hasta que se renueve tu cupo. Lo recomendado es Max 5x.' }
+        default { return Nuevo-Resultado 'cuenta' $nombre 'aviso' "plan «$($estado.subscriptionType)» ($($estado.authMethod))" 'Lo recomendado es Claude Max 5x.' }
     }
 }
 
@@ -406,7 +406,7 @@ function Comprobar-Plugin {
     if (-not $e) { return Nuevo-Resultado 'plugin' $nombre 'falta' 'sin Node.js no se pueden leer los ajustes de Claude' 'Instala Node.js con el instalador de Drazo.' }
     if ($e['ajustes'] -eq 'json-invalido') { return Nuevo-Resultado 'plugin' $nombre 'falta' 'los ajustes de Claude no se pueden leer' "Revisa el fichero: $($e['detalle'])" }
     if ($e['marketplace'] -ne 'si' -or $e['activado'] -ne 'si') { return Nuevo-Resultado 'plugin' $nombre 'falta' 'no está registrado' 'Regístralo con el paso «registrar» del instalador de Drazo.' }
-    if ($e['descargado'] -ne 'si') { return Nuevo-Resultado 'plugin' $nombre 'aviso' "registrado ($($e['fuente'])), aún sin descargar" 'Cierra la app de Claude y vuelve a abrirla: Drazo se descarga al arrancar.' }
+    if ($e['descargado'] -ne 'si') { return Nuevo-Resultado 'plugin' $nombre 'aviso' "registrado ($($e['fuente'])), aún sin descargar" 'Vuelve a pasar el paso «registrar» del instalador: lo descarga e instala. Después, cierra la app de Claude del todo y ábrela.' }
     $detalle = if ($e['version']) { "registrado y descargado (versión $($e['version']))" } else { "registrado, cargado desde $($e['fuente'])" }
     Nuevo-Resultado 'plugin' $nombre 'ok' $detalle
 }

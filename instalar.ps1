@@ -4,7 +4,8 @@
 # Uso:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File instalar.ps1 -SoloComprobar     solo mira, no cambia nada
 #   ... -Doctor                                         pasa el doctor completo (también prueba el servidor)
-#   ... -Si [-Pasos git,node,...] [-Licencia drz_...]   sin preguntas (el permiso ya se pidió en el chat)
+#   ... -Si [-Pasos git,node,...] [-Licencia drz_...] [-Carpeta <ruta>]   sin preguntas (pegar INSTALAR.md ya es su sí)
+#       -Carpeta: crea ahí videos\ y el CLAUDE.md de Drazo
 #   ... (sin opciones)                                  pregunta en la terminal antes de cada paso
 #   ... -Marketplace <carpeta del repo>                 registra Drazo desde una carpeta local (pruebas)
 # Pasos: git node claude ffmpeg python venv modelo playwright chrome navegador skills fuentes telemetria tesseract registrar
@@ -17,7 +18,8 @@ param(
     [switch]$Si,
     [string]$Pasos,
     [string]$Licencia,
-    [string]$Marketplace
+    [string]$Marketplace,
+    [string]$Carpeta
 )
 
 # Repo de GitHub con el marketplace y el plugin de Drazo.
@@ -196,7 +198,8 @@ function Pedir-Licencia {
     ''
 }
 
-# Marketplace, plugin y licencia en los ajustes de Claude (settings.json), con copia de seguridad.
+# Marketplace, plugin y licencia en los ajustes de Claude (settings.json, con copia de seguridad), el plugin
+# descargado con la orden claude y, con -Carpeta, la carpeta de trabajo preparada.
 function Registrar-Drazo {
     $clave = $Licencia
     if (-not $clave -and -not $Si) { $clave = Pedir-Licencia }
@@ -204,6 +207,14 @@ function Registrar-Drazo {
     if ($clave) { $argumentos += @('--licencia', $clave) }
     if ($Marketplace) { $argumentos += @('--fuente-local', $Marketplace) }
     Ajustes-Claude $argumentos
+    # La app no siempre baja el plugin al reabrirse: se descarga e instala ya con la orden claude
+    $c = Ruta-Claude
+    if (-not $c) { Instalar-Claude; $c = Ruta-Claude }
+    if (-not $c) { throw 'no encuentro la orden claude para descargar Drazo' }
+    $plugin = @('instalar-plugin', '--claude', $c)
+    if ($Marketplace) { $plugin += @('--fuente-local', $Marketplace) }
+    Ajustes-Claude $plugin
+    if ($Carpeta) { Ajustes-Claude @('carpeta', '--ruta', $Carpeta) }
 }
 
 function Comprobar-Registro {
@@ -248,7 +259,7 @@ function Principal {
     $catalogo = Nuevo-Catalogo
     Write-Host ''
     Write-Host 'Drazo Pro · instalador para Windows' -ForegroundColor Cyan
-    Write-Host 'Drazo Pro funciona con Claude (app de escritorio o Claude Code) y una suscripción a Claude Max 5x o superior.'
+    Write-Host 'Drazo Pro funciona con Claude (app de escritorio o Claude Code) y una suscripción de pago a Claude (recomendado Max 5x).'
     if ($SoloComprobar) { Write-Host 'Modo solo comprobar: no se instala ni se cambia nada.' -ForegroundColor Yellow }
     Write-Host ''
     $resultados = @(foreach ($f in $ComprobacionesDrazo) { $r = Ejecutar-Comprobacion $f; Mostrar-Resultado $r; $r })

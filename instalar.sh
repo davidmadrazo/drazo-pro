@@ -5,7 +5,8 @@
 # Uso:
 #   bash instalar.sh --solo-comprobar                         solo mira, no cambia nada
 #   bash instalar.sh --doctor                                 pasa el doctor completo (también prueba el servidor)
-#   bash instalar.sh --si [--pasos git,node,...] [--licencia drz_...]   sin preguntas
+#   bash instalar.sh --si [--pasos git,node,...] [--licencia drz_...] [--carpeta <ruta>]   sin preguntas
+#                                                             (--carpeta: crea ahí videos/ y el CLAUDE.md de Drazo)
 #   bash instalar.sh                                          pregunta antes de cada paso
 #   bash instalar.sh --marketplace <carpeta del repo>         registra Drazo desde una carpeta (pruebas)
 # Pasos: git node claude ffmpeg python venv modelo playwright chrome navegador skills fuentes telemetria tesseract registrar
@@ -17,7 +18,7 @@ REPO_DRAZO="davidmadrazo/drazo-pro"
 RAMA_DRAZO="main"
 URL_BASE_DRAZO="https://raw.githubusercontent.com/$REPO_DRAZO/$RAMA_DRAZO"
 
-SOLO_COMPROBAR=0; DOCTOR=0; SI=0; PASOS=""; LICENCIA=""; MARKETPLACE=""
+SOLO_COMPROBAR=0; DOCTOR=0; SI=0; PASOS=""; LICENCIA=""; MARKETPLACE=""; CARPETA=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --solo-comprobar) SOLO_COMPROBAR=1 ;;
@@ -26,7 +27,8 @@ while [ $# -gt 0 ]; do
         --pasos) PASOS="$2"; shift ;;
         --licencia) LICENCIA="$2"; shift ;;
         --marketplace) MARKETPLACE="$2"; shift ;;
-        *) echo "Opción desconocida: $1 (usa --solo-comprobar, --si, --pasos, --licencia o --marketplace)"; exit 2 ;;
+        --carpeta) CARPETA="$2"; shift ;;
+        *) echo "Opción desconocida: $1 (usa --solo-comprobar, --si, --pasos, --licencia, --carpeta o --marketplace)"; exit 2 ;;
     esac
     shift
 done
@@ -281,14 +283,23 @@ pedir_licencia() {
     done
 }
 
-# Marketplace, plugin y licencia en los ajustes de Claude (settings.json), con copia de seguridad.
+# Marketplace, plugin y licencia en los ajustes de Claude (settings.json, con copia de seguridad), el plugin
+# descargado con la orden claude y, con --carpeta, la carpeta de trabajo preparada.
 instalar_registrar() {
-    local clave="$LICENCIA"
+    local clave="$LICENCIA" c
     [ -z "$clave" ] && [ "$SI" != "1" ] && clave="$(pedir_licencia)"
     set -- registrar
     [ -n "$clave" ] && set -- "$@" --licencia "$clave"
     [ -n "$MARKETPLACE" ] && set -- "$@" --fuente-local "$MARKETPLACE"
-    ajustes_claude "$@"
+    ajustes_claude "$@" || return 1
+    # La app no siempre baja el plugin al reabrirse: se descarga e instala ya con la orden claude
+    c="$(ruta_claude)"
+    if [ -z "$c" ]; then instalar_claude || return 1; c="$(ruta_claude)"; fi
+    if [ -z "$c" ]; then echo "No encuentro la orden claude para descargar Drazo."; return 1; fi
+    set -- instalar-plugin --claude "$c"
+    [ -n "$MARKETPLACE" ] && set -- "$@" --fuente-local "$MARKETPLACE"
+    ajustes_claude "$@" || return 1
+    if [ -n "$CARPETA" ]; then ajustes_claude carpeta --ruta "$CARPETA" || return 1; fi
 }
 
 texto_paso() {
@@ -330,7 +341,7 @@ principal() {
     local id v lista="" codigo hechos="" ya="" fallan="" omitidos="" pendientes="" uso_malo=0
     echo ""
     echo "${C_CIAN}Drazo Pro · instalador para macOS${C_FIN}"
-    echo "Drazo Pro funciona con Claude (app de escritorio o Claude Code) y una suscripción a Claude Max 5x o superior."
+    echo "Drazo Pro funciona con Claude (app de escritorio o Claude Code) y una suscripción de pago a Claude (recomendado Max 5x)."
     [ "$SOLO_COMPROBAR" = "1" ] && echo "${C_AMARILLO}Modo solo comprobar: no se instala ni se cambia nada.${C_FIN}"
     echo ""
     cargar_rutas_drazo

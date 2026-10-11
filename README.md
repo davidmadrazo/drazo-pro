@@ -17,14 +17,15 @@ Drazo Pro edita tus vídeos dentro de Claude, en tu propio ordenador. Le dices �
 
    > Instala Drazo Pro siguiendo https://raw.githubusercontent.com/davidmadrazo/drazo-pro/main/INSTALAR.md. Mi clave de licencia es drz_…
 
-4. Claude lo instala todo. Tú solo apruebas los permisos que te pida en el chat. En Windows verás también ventanas «¿Quieres permitir que esta aplicación haga cambios?»: pulsa **Sí**. En Mac puede abrirse una ventana de Apple para instalar las herramientas de desarrollo: pulsa **Instalar**.
+4. Claude lo instala todo sin preguntarte. Tú solo aceptas los permisos que te pida en el chat. En Windows verás también ventanas «¿Quieres permitir que esta aplicación haga cambios?»: pulsa **Sí**. En Mac puede abrirse una ventana de Apple para instalar las herramientas de desarrollo: pulsa **Instalar**.
 5. Cuando Claude te lo diga, **cierra la app del todo y vuelve a abrirla**.
 
 ## Tu primer vídeo
 
-1. Abre una conversación nueva en la pestaña **Code** y elige la carpeta de tus vídeos.
+1. Abre una conversación nueva en la pestaña **Code**, en la misma carpeta donde instalaste Drazo.
 2. Escribe **«Hola Drazo»**. La primera vez te pedirá tu @ de Instagram y te hará unas preguntas, una a una, para aprender tu estilo (letra, colores, subtítulos, ritmo). Solo se hace una vez.
 3. Después, dile **«edítame el vídeo»**. **Pega siempre el guion del vídeo: sale mejor.**
+4. Tus vídeos editados aparecen en la carpeta **videos** de esa carpeta.
 
 ¿Quieres probar antes de las preguntas? Di **«edítamelo viral»**: Drazo edita con un estilo de prueba y, al entregarte el vídeo, te ofrece hacer el onboarding.
 

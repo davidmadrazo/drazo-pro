@@ -270,26 +270,26 @@ comprobar_claude() {
     [ -n "$c" ] && partes="${partes:+$partes y }Claude Code $(leer_version "$("$c" --version 2>/dev/null)")"
     if [ -n "$partes" ]; then resultado claude "$nombre" ok "$partes"; return; fi
     if [ "${CLAUDECODE:-}" = "1" ]; then resultado claude "$nombre" ok "esta sesión de Claude Code"; return; fi
-    resultado claude "$nombre" falta "no está" "Instala la app de escritorio de Claude (claude.com/download) y entra con tu cuenta de Claude Max."
+    resultado claude "$nombre" falta "no está" "Instala la app de escritorio de Claude (claude.com/download) y entra con tu cuenta de Claude."
 }
 
 comprobar_cuenta() {
-    local nombre="Cuenta de Claude Max (5x o superior)" c json sesion plan
+    local nombre="Cuenta de Claude (Max 5x recomendado)" c json sesion plan
     c="$(ruta_claude)"
-    if [ -z "$c" ]; then resultado cuenta "$nombre" aviso "sin la orden claude no se puede mirar el plan" "Comprueba en claude.ai que tu plan es Max 5x o superior."; return; fi
+    if [ -z "$c" ]; then resultado cuenta "$nombre" aviso "sin la orden claude no se puede mirar el plan" "Lo recomendado es Claude Max 5x; con Pro funciona, pero puede pausarse."; return; fi
     json="$("$c" auth status --json 2>/dev/null)"
-    if [ -z "$json" ]; then resultado cuenta "$nombre" aviso "no se pudo leer" "Abre una terminal, escribe claude y entra con tu cuenta de Claude Max."; return; fi
+    if [ -z "$json" ]; then resultado cuenta "$nombre" aviso "no se pudo leer" "Abre una terminal, escribe claude y entra con tu cuenta de Claude."; return; fi
     sesion="$(printf '%s' "$json" | json_eval 'd && d.loggedIn')"
     plan="$(printf '%s' "$json" | json_eval 'd && d.subscriptionType')"
     if [ -z "$sesion" ]; then
         printf '%s' "$json" | grep -q '"loggedIn": *true' && sesion="true"
         plan="$(printf '%s' "$json" | sed -n 's/.*"subscriptionType": *"\([^"]*\)".*/\1/p' | head -n 1)"
     fi
-    if [ "$sesion" != "true" ]; then resultado cuenta "$nombre" falta "sin sesión iniciada" "Abre una terminal, escribe claude y entra con tu cuenta de Claude Max (5x o superior)."; return; fi
+    if [ "$sesion" != "true" ]; then resultado cuenta "$nombre" falta "sin sesión iniciada" "Abre una terminal, escribe claude y entra con tu cuenta de Claude."; return; fi
     case "$plan" in
         max) resultado cuenta "$nombre" ok "sesión iniciada con Claude Max" ;;
-        pro) resultado cuenta "$nombre" falta "plan Pro" "Drazo Pro necesita Claude Max 5x o superior: con Pro se queda corto. Cambia de plan en claude.ai." ;;
-        *) resultado cuenta "$nombre" aviso "plan «$plan»" "Drazo Pro está pensado para Claude Max 5x o superior." ;;
+        pro) resultado cuenta "$nombre" aviso "plan Pro" "Con Pro funciona, pero editar un vídeo gasta mucho y puede pausarse hasta que se renueve tu cupo. Lo recomendado es Max 5x." ;;
+        *) resultado cuenta "$nombre" aviso "plan «$plan»" "Lo recomendado es Claude Max 5x." ;;
     esac
 }
 
@@ -437,7 +437,7 @@ comprobar_plugin() {
     if ! estado_ajustes; then resultado plugin "$nombre" falta "sin Node.js no se pueden leer los ajustes de Claude" "Instala Node.js con el instalador de Drazo."; return; fi
     if [ "${AJ_ajustes:-}" = "json-invalido" ]; then resultado plugin "$nombre" falta "los ajustes de Claude no se pueden leer" "Revisa el fichero: ${AJ_detalle:-}"; return; fi
     if [ "${AJ_marketplace:-}" != "si" ] || [ "${AJ_activado:-}" != "si" ]; then resultado plugin "$nombre" falta "no está registrado" "Regístralo con el paso «registrar» del instalador de Drazo."; return; fi
-    if [ "${AJ_descargado:-}" != "si" ]; then resultado plugin "$nombre" aviso "registrado (${AJ_fuente:-}), aún sin descargar" "Cierra la app de Claude y vuelve a abrirla: Drazo se descarga al arrancar."; return; fi
+    if [ "${AJ_descargado:-}" != "si" ]; then resultado plugin "$nombre" aviso "registrado (${AJ_fuente:-}), aún sin descargar" "Vuelve a pasar el paso «registrar» del instalador: lo descarga e instala. Después, cierra la app de Claude del todo y ábrela."; return; fi
     if [ -n "${AJ_version:-}" ]; then resultado plugin "$nombre" ok "registrado y descargado (versión $AJ_version)"; return; fi
     resultado plugin "$nombre" ok "registrado, cargado desde ${AJ_fuente:-}"
 }
