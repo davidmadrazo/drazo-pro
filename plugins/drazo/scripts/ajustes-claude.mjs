@@ -130,14 +130,22 @@ export function instalarPlugin({ claude, fuenteLocal }) {
   const mercado = ejecutarClaude(claude, ["plugin", "marketplace", "add", fuenteLocal ? resolve(fuenteLocal) : REPO])
   const instalar = () => resultadoJson(ejecutarClaude(claude, ["plugin", "install", ID_PLUGIN, "--scope", "user", "--json", "-y",
     ...(licencia ? ["--config", `licencia=${licencia}`] : [])]))
+  // El catálogo al día antes de instalar: si no, «install» no ve la versión nueva
+  ejecutarClaude(claude, ["plugin", "marketplace", "update", MARKETPLACE])
   let r = instalar()
   if (r?.outcome !== "ok") {
     ejecutarClaude(claude, ["plugin", "marketplace", "update", MARKETPLACE])
     r = instalar()
   }
+  let detalle = r?.message || mercado.split(/\r?\n/).pop() || "sin respuesta de la orden claude"
+  // Ya instalado en una versión vieja: «install» no lo toca, se actualiza aparte (se aplica al reabrir la app)
+  if (r?.outcome === "ok" && r.installedVersion && r.availableVersion && r.installedVersion !== r.availableVersion) {
+    const salida = ejecutarClaude(claude, ["plugin", "update", ID_PLUGIN])
+    detalle = `tenía la ${r.installedVersion} y hay la ${r.availableVersion}: ${salida.split(/\r?\n/).pop()}`
+  }
   // La orden claude reescribe la entrada del marketplace: se vuelven a poner autoUpdate, env y licencia
   guardar(registrar(leerAjustes(), { licencia, fuenteLocal }))
-  return { ok: r?.outcome === "ok", detalle: r?.message || mercado.split(/\r?\n/).pop() || "sin respuesta de la orden claude" }
+  return { ok: r?.outcome === "ok", detalle }
 }
 
 export function guardar(a) {

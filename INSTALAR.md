@@ -80,7 +80,7 @@ Comprobación: `-> [registrar] ok: registrado y descargado`, y en esta carpeta, 
 
 Lo que hace este paso, por si alguna vez hay que comprobarlo a mano:
 1. Fusiona en `~/.claude/settings.json` (Windows: `%USERPROFILE%\.claude\settings.json`; o en `CLAUDE_CONFIG_DIR` si existe), con copia de seguridad antes (`settings.json.antes-de-drazo-<fecha>`) y sin tocar lo demás: el marketplace `drazo` (`davidmadrazo/drazo-pro`, con actualización automática), el plugin `drazo@drazo` activado, la licencia en `pluginConfigs` y, en `env`, `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` y `MCP_TOOL_TIMEOUT=900000`.
-2. Descarga e instala el plugin con la orden `claude` (`claude plugin marketplace add davidmadrazo/drazo-pro` y `claude plugin install drazo@drazo --scope user`). Si no está esa orden, la instala con el instalador oficial de Anthropic, sin contraseña de administrador. La app no siempre lo descarga sola al reabrirse: por eso se hace aquí.
+2. Descarga e instala el plugin con la orden `claude` (`claude plugin marketplace add davidmadrazo/drazo-pro` y `claude plugin install drazo@drazo --scope user`); si ya estaba en una versión anterior, lo actualiza (`claude plugin update drazo@drazo`). Si no está esa orden, la instala con el instalador oficial de Anthropic, sin contraseña de administrador. La app no siempre lo descarga sola al reabrirse: por eso se hace aquí.
 3. Crea `videos` en esta carpeta y escribe en su `CLAUDE.md` el bloque de Drazo (si ya había un `CLAUDE.md`, lo añade al final sin tocar lo demás).
 
 ## 6. Comprobación final
@@ -92,6 +92,10 @@ Debe salir todo en verde. «Drazo registrado» tiene que decir «registrado y de
 ## 7. Reinicia y empieza
 
 Díselo así: «¡Listo! Cierra la app de Claude del todo (en Mac, Cmd+Q; en Windows, ciérrala también desde el icono junto al reloj) y vuelve a abrirla. Después abre una conversación nueva en la pestaña Code, en esta misma carpeta, y escribe "Hola Drazo": te pedirá tu @ de Instagram y te hará unas preguntas para aprender tu estilo. O, si quieres probar ya, di "edítamelo viral". Cuando edites, pega siempre el guion del vídeo: sale mejor. Tus vídeos editados aparecerán en la carpeta "videos"».
+
+## Para actualizar Drazo
+
+Si el usuario pide actualizar Drazo, repite solo el paso 5 sin la clave (Windows: `INSTALAR -Si -Pasos registrar -Carpeta "$PWD"`; macOS: `INSTALAR --si --pasos registrar --carpeta "$PWD"`) y pídele que cierre la app del todo y la vuelva a abrir.
 
 ## Si después de reiniciar Drazo no responde
 
