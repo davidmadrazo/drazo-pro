@@ -6,7 +6,7 @@
       "headers": {
         "Authorization": "Bearer ${user_config.licencia}"
       },
-      "timeout": 300000
+      "timeout": 900000
     }
   }
 }
