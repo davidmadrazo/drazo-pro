@@ -35,6 +35,14 @@ Con «hola drazo», «empezar con drazo» o «configura mi marca»: llama a `dra
 
 **Carpetas**: el usuario encuentra sus vídeos editados en la carpeta `videos/` de la carpeta de Drazo (cada versión que le enseñes y el vídeo final); el trabajo de cada vídeo va en `proyectos/<video>/`. Si falta alguna, créala.
 
+## Cuando pide variantes o un cambio de un vídeo ya hecho
+
+Es el mismo vídeo: se trabaja en su proyecto (`proyectos/<video>/`, con su `proyecto_id` en su `LEEME.md`), nunca en uno nuevo, y no se pide otra dirección.
+
+- **Variantes, otros ganchos o «reels de prueba»**: `drazo_guia` con la fase `variantes` y `drazo_variantes`, una sola llamada para todas. Salen como `videos/<video>-prueba-A.mp4`, `-B`… y no cuentan como vídeos nuevos en su plan.
+- **Un cambio pequeño** (un texto, un color, una escena, la música): hazlo en el proyecto, renderiza y compruébalo en este ordenador (medidas y hoja de fotogramas), sin `drazo_revisar`.
+- **Si el proyecto ya está cerrado** (Drazo lo dice), entonces sí empieza uno nuevo con `drazo_empezar`.
+
 **Modo prueba**: si el usuario dice «edítamelo viral», «sin preguntas» o «modo prueba», no hay onboarding: `drazo_onboarding` trae la `ficha_modo_prueba`; guárdala con el nicho que encaje y edita. Cuando `drazo_estado` devuelva `modo_prueba: true`, al entregar el vídeo ofrécele hacer el onboarding.
 
 En cualquier momento el usuario puede pedir «rehaz mi onboarding» (`drazo_onboarding`) o «cambia mis colores» o «cambia mi letra» (`drazo_marca`).
