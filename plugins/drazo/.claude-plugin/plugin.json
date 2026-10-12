@@ -1,7 +1,7 @@
 {
   "name": "drazo",
   "displayName": "Drazo Pro",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Editor de vídeo Drazo Pro para Claude Code: la skill que arranca la edición y la conexión con el servidor de Drazo usando tu clave de licencia.",
   "author": {
     "name": "ProfimaxIA",

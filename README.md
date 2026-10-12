@@ -31,6 +31,31 @@ Drazo Pro edita tus vídeos dentro de Claude, en tu propio ordenador. Le dices �
 
 Cuando quieras, puedes decir «rehaz mi onboarding», «cambia mis colores» o «cambia mi letra».
 
+## Qué le puedes pedir
+
+Escríbeselo con tus palabras; estos son ejemplos:
+
+| Escribe | Qué hace | ¿Cuenta como vídeo de tu plan? |
+|---|---|---|
+| «Edítame el vídeo» (con los brutos en tu carpeta de Drazo y el guion pegado) | Un vídeo nuevo, de principio a fin | Sí |
+| «Cámbiale el título por…», «pon el texto en azul», «quita la parte de…», «hazlo más corto», «sin música» | Un cambio pequeño del último vídeo | No |
+| «Cambia el orden: empieza por…», «otra llamada final: …» | Un cambio grande del mismo vídeo | No |
+| «Hazme 3 variantes para reels de prueba» (o «prueba otro gancho», «otra primera frase», «una versión más corta») | Otros arranques del mismo vídeo, en `videos/<vídeo>-prueba-A.mp4`, `-B`… | No |
+| «¿Cuántos vídeos me quedan?» | Lo que llevas del mes y lo que incluye cada vídeo | — |
+
+Si quieres cambiar un vídeo que no es el último, dile cuál.
+
+### Lo que incluye tu plan
+
+Tu plan tiene un número de vídeos al mes (se renueva el día 1). Cada vídeo incluye:
+
+- cambios pequeños sin límite;
+- un cambio grande;
+- cuatro revisiones de Drazo;
+- dos tandas de variantes para reels de prueba, de hasta 6 cada una.
+
+Si agotas algo de un vídeo, Drazo te lo dice y puedes empezar ese vídeo de nuevo, que cuenta como otro vídeo de tu plan. Pregunta «¿cuántos vídeos me quedan?» para ver los números de tu plan.
+
 Claude te pedirá permiso para usar las herramientas de Drazo y para ejecutar los comandos con los que descarga sus motores: elige la opción de permitirlo siempre para que no te pregunte cada vez.
 
 ### Tus vídeos no salen de tu ordenador
