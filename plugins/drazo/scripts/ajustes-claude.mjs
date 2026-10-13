@@ -11,7 +11,7 @@
 // Antes de escribir siempre deja copia (settings.json.antes-de-drazo-<fecha>). Si el fichero no es JSON
 // válido, no lo toca. Códigos: 0 bien · 1 no se pudo · 2 uso incorrecto.
 import { spawnSync } from "node:child_process"
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -259,6 +259,17 @@ function principal(argv) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Solo al ejecutarlo como script. Se comparan las rutas reales: en Mac la carpeta temporal (/var/folders)
+// es un enlace a /private/var/folders y, comparando las rutas tal cual, el script salía sin hacer nada.
+function esPrincipal() {
+  if (!process.argv[1]) return false
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    return resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+  }
+}
+
+if (esPrincipal()) {
   process.exitCode = principal(process.argv.slice(2))
 }

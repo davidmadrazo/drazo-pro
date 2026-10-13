@@ -47,6 +47,8 @@ preparar_plugin() {
         return 0
     fi
     CARPETA_TEMPORAL="$(mktemp -d "${TMPDIR:-/tmp}/drazo-instalador.XXXXXX")" || return 1
+    # En Mac $TMPDIR (/var/folders) es un enlace a /private/var/folders: se trabaja con la ruta real
+    CARPETA_TEMPORAL="$(cd "$CARPETA_TEMPORAL" && pwd -P)" || return 1
     PLUGIN="$CARPETA_TEMPORAL/plugin"
     for f in $FICHEROS_PLUGIN; do
         mkdir -p "$PLUGIN/$(dirname "$f")"
@@ -236,8 +238,16 @@ instalar_fuentes() {
 
 ajustes_claude() {
     command -v node >/dev/null 2>&1 || { echo "Falta Node.js (paso node)."; return 1; }
-    node "$AJUSTES_SCRIPT" "$@"
-    local codigo=$?
+    local registro codigo
+    registro="$(mktemp)"
+    node "$AJUSTES_SCRIPT" "$@" 2>&1 | tee "$registro"
+    codigo=${PIPESTATUS[0]}
+    # Si termina bien sin escribir nada es que no llegó a ejecutarse: que no pase en silencio
+    if [ "$codigo" -eq 0 ] && [ ! -s "$registro" ]; then
+        echo "Los ajustes de Claude no se han aplicado: $AJUSTES_SCRIPT terminó sin hacer nada."
+        codigo=1
+    fi
+    rm -f "$registro"
     estado_ajustes --renovar
     return "$codigo"
 }
