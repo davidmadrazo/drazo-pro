@@ -50,7 +50,7 @@ Si quieres cambiar un vídeo que no es el último, dile cuál.
 Tu plan tiene un número de vídeos al mes (se renueva el día 1). Cada vídeo incluye:
 
 - cambios pequeños sin límite;
-- un cambio grande;
+- dos cambios grandes;
 - cuatro revisiones de Drazo;
 - dos tandas de variantes para reels de prueba, de hasta 6 cada una.
 

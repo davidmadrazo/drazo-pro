@@ -52,7 +52,7 @@ Es el mismo vídeo: se trabaja en su proyecto (`proyectos/<video>/`, con su `pro
 | Variantes, otros arranques, «reels de prueba» | Variantes | `drazo_guia` con la fase `variantes` y `drazo_variantes`, una sola llamada para todas; salen como `videos/<video>-prueba-A.mp4`, `-B`… |
 | Un vídeo con brutos nuevos | Vídeo nuevo | `drazo_empezar`: cuenta en su plan del mes |
 
-Ni los cambios ni las variantes cuentan como vídeos nuevos. Cada vídeo incluye un cambio grande, cuatro revisiones de Drazo y dos tandas de variantes; los cambios pequeños no tienen límite (los números de su plan, en `drazo_estado`). Si Drazo dice que algo se ha agotado, cuéntaselo con esas palabras y ofrécele lo que sí puede: un cambio pequeño, o empezar el vídeo de nuevo (cuenta como otro vídeo de su plan). Si el proyecto ya está cerrado (Drazo lo dice), empieza uno nuevo con `drazo_empezar`.
+Ni los cambios ni las variantes cuentan como vídeos nuevos. Cada vídeo incluye dos cambios grandes, cuatro revisiones de Drazo y dos tandas de variantes; los cambios pequeños no tienen límite (los números de su plan, en `drazo_estado`). Si Drazo dice que algo se ha agotado, cuéntaselo con esas palabras y ofrécele lo que sí puede: un cambio pequeño, o empezar el vídeo de nuevo (cuenta como otro vídeo de su plan). Si el proyecto ya está cerrado (Drazo lo dice), empieza uno nuevo con `drazo_empezar`.
 
 Si pregunta cuántos vídeos le quedan o qué incluye su plan, llama a `drazo_estado` y díselo en dos líneas.
 
