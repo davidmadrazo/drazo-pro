@@ -95,7 +95,7 @@ Díselo así: «¡Listo! Cierra la app de Claude del todo (en Mac, Cmd+Q; en Win
 
 ## Para actualizar Drazo
 
-Si el usuario pide actualizar Drazo, repite solo el paso 5 sin la clave (Windows: `INSTALAR -Si -Pasos registrar -Carpeta "$PWD"`; macOS: `INSTALAR --si --pasos registrar --carpeta "$PWD"`) y pídele que cierre la app del todo y la vuelva a abrir.
+Si el usuario pide actualizar Drazo, o Drazo dice que está desactualizado, sin preguntar: vuelve a descargar el instalador (paso 2, que trae el de siempre al día) y repite solo el paso 5 sin la clave (Windows: `INSTALAR -Si -Pasos registrar -Carpeta "$PWD"`; macOS: `INSTALAR --si --pasos registrar --carpeta "$PWD"`). Después pídele que cierre la app de Claude del todo (en Mac, Cmd+Q) y la vuelva a abrir.
 
 ## Si después de reiniciar Drazo no responde
 

@@ -13,7 +13,7 @@ El método de edición vive en el servidor de Drazo y llega por sus herramientas
 
 | Herramienta | Para qué |
 |---|---|
-| `drazo_estado` | Lo primero, siempre: licencia, onboarding, marca y modo prueba del usuario |
+| `drazo_estado` | Lo primero, siempre: licencia, onboarding, marca y modo prueba del usuario. Si trae `antes_de_nada`, hazlo antes que cualquier otra cosa |
 | `drazo_onboarding` | Conocer al usuario y su estilo antes del primer vídeo, o rehacerlo |
 | `drazo_marca` | Guardar o cambiar sus colores, letras y estilo |
 | `drazo_empezar` | Abrir el proyecto de un vídeo y recibir su plan de trabajo |
