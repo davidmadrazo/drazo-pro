@@ -5,7 +5,7 @@
       "url": "https://drazo.vercel.app/api/mcp",
       "headers": {
         "Authorization": "Bearer ${user_config.licencia}",
-        "X-Drazo-Plugin": "0.5.4"
+        "X-Drazo-Plugin": "0.5.5"
       },
       "timeout": 900000
     }

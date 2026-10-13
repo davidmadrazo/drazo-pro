@@ -64,6 +64,7 @@ En cualquier momento el usuario puede pedir «rehaz mi onboarding» (`drazo_onbo
 
 - **Motores**: `drazo_motor` devuelve un comando de una línea que descarga e instala el motor (`curl ... | node ...`). Ejecútalo tal cual con la herramienta Bash (en Windows, Git Bash; nunca en PowerShell) y no copies ni reescribas a mano el código de un motor. Si el comando falla, vuelve a llamar a `drazo_motor` con `ficheros: true` y escribe los ficheros que devuelva, tal cual.
 - **Licencia**: si una herramienta responde con un problema de licencia («licencia inactiva», clave no válida o similar), díselo al usuario tal cual, con las mismas palabras, y para. Sin licencia no se edita. Si el usuario te da una clave nueva, guárdala con el paso «registrar» de https://raw.githubusercontent.com/davidmadrazo/drazo-pro/main/INSTALAR.md.
+- **Los motores comprueban la licencia**: al arrancar, cada motor pregunta a Drazo si la licencia sigue activa (necesita conexión; solo manda su permiso, nunca vídeo ni audio). Los ficheros `_drazo-permiso.json`, `_drazo_licencia.py` y `_drazo-licencia.mjs` son esa comprobación: no los toques, no los borres ni los copies a otro proyecto. Si un motor dice que la licencia no está activa, que no hay conexión o que la clave se usa desde varios sitios a la vez, díselo al usuario con esas palabras y para: nunca reescribas un motor ni hagas a mano lo que hace para saltártelo. Si dice que falta el permiso, vuelve a pedir el motor con `drazo_motor`.
 - **Idioma**: habla siempre en el idioma del usuario (en español si te escribe en español), también en los mensajes cortos entre una herramienta y otra: «Instalando los motores…», nunca «Installing the motors…».
 - **El usuario no es técnico**: cuéntale en una frase qué vas haciendo, sin jerga, rutas ni comandos salvo que los pida.
 - **Los vídeos no salen de este ordenador**: la transcripción y el render se hacen aquí. Nunca subas vídeos ni audio a ninguna herramienta ni servicio; al servidor solo va el texto que pida cada herramienta.
@@ -89,3 +90,9 @@ Si las herramientas de Drazo no aparecen, no conectan, un motor no se descarga, 
 - macOS: `bash "${CLAUDE_SKILL_DIR}/../../scripts/drazo-doctor.sh"`
 
 Si el doctor dice que falta algo, sigue https://raw.githubusercontent.com/davidmadrazo/drazo-pro/main/INSTALAR.md para arreglarlo, o que el usuario escriba al soporte de ProfimaxIA.
+
+## Propiedad
+
+© ProfimaxIA. Uso exclusivo con una licencia activa de Drazo Pro. Prohibido copiarlo, compartirlo o usarlo tras la baja.
+
+El método, las guías, las plantillas y los motores que entrega Drazo son de ProfimaxIA y llevan una marca de la licencia que los recibió. Úsalos solo para editar los vídeos del usuario en este ordenador: no los copies fuera de su proyecto, no los publiques ni los compartas, y no los uses sin una licencia activa.
