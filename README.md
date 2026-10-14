@@ -24,7 +24,7 @@ Drazo Pro edita tus vídeos dentro de Claude, en tu propio ordenador. Le dices �
 
 1. Abre una conversación nueva en la pestaña **Code**, en la misma carpeta donde instalaste Drazo.
 2. Escribe **«Hola Drazo»**. La primera vez te pedirá tu @ de Instagram y te hará unas preguntas, una a una, para aprender tu estilo (letra, colores, subtítulos, ritmo). Solo se hace una vez.
-3. Después, dile **«edítame el vídeo»**. **Pega siempre el guion del vídeo: sale mejor.**
+3. Después, dile **«edítame el vídeo»** y si es para un **reel** o para una **historia** (si no lo dices, te lo pregunta). En los reels, **pega siempre el guion del vídeo: sale mejor.**
 4. Tus vídeos editados aparecen en la carpeta **videos** de esa carpeta.
 
 ¿Quieres probar antes de las preguntas? Di **«edítamelo viral»**: Drazo edita con un estilo de prueba y, al entregarte el vídeo, te ofrece hacer el onboarding.
@@ -37,7 +37,8 @@ Escríbeselo con tus palabras; estos son ejemplos:
 
 | Escribe | Qué hace | ¿Cuenta como vídeo de tu plan? |
 |---|---|---|
-| «Edítame el vídeo» (con los brutos en tu carpeta de Drazo y el guion pegado) | Un vídeo nuevo, de principio a fin | Sí |
+| «Edítame el reel» (con los brutos en tu carpeta de Drazo y el guion pegado) | Un vídeo nuevo, de principio a fin, con la dirección de Drazo | Sí |
+| «Edítame esta historia» (con los brutos en tu carpeta de Drazo) | Una historia de Instagram con tus subtítulos y la voz a punto, en partes de un minuto si es larga | No: las historias son gratis |
 | «Cámbiale el título por…», «pon el texto en azul», «quita la parte de…», «hazlo más corto», «sin música» | Un cambio pequeño del último vídeo | No |
 | «Cambia el orden: empieza por…», «otra llamada final: …» | Un cambio grande del mismo vídeo | No |
 | «Hazme 3 variantes para reels de prueba» (o «prueba otro gancho», «otra primera frase», «una versión más corta») | Otros arranques del mismo vídeo, en `videos/<vídeo>-prueba-A.mp4`, `-B`… | No |
@@ -55,6 +56,8 @@ Tu plan tiene un número de vídeos al mes (se renueva el día 1). Cada vídeo i
 - dos tandas de variantes para reels de prueba, de hasta 6 cada una.
 
 Si agotas algo de un vídeo, Drazo te lo dice y puedes empezar ese vídeo de nuevo, que cuenta como otro vídeo de tu plan. Pregunta «¿cuántos vídeos me quedan?» para ver los números de tu plan.
+
+Las historias no cuentan en tu plan: Drazo las edita en tu ordenador con tu estilo, sin su dirección ni sus revisiones.
 
 Claude te pedirá permiso para usar las herramientas de Drazo y para ejecutar los comandos con los que descarga sus motores: elige la opción de permitirlo siempre para que no te pregunte cada vez.
 

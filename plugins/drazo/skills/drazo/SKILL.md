@@ -1,7 +1,7 @@
 ---
 name: drazo
-description: Editor de vídeo Drazo Pro. Úsala siempre que el usuario quiera editar o montar un vídeo, un bruto o un reel («edítame el vídeo», «edita este bruto», «monta este vídeo», «edítamelo viral»), cuando salude o empiece con Drazo («hola drazo», «empezar con drazo»), cuando quiera variantes, reels de prueba o un cambio de un vídeo ya hecho, cuando pregunte cuántos vídeos le quedan, cuando quiera configurar o cambiar su marca o rehacer su onboarding, o cuando Drazo dé un error. Va antes que las skills de HyperFrames o Tesseract, que solo se usan cuando lo indique el servidor de Drazo. El método lo da el servidor con sus herramientas; esta skill solo dice cómo usarlas.
-when_to_use: Frases como «hola drazo», «empezar con drazo», «configura mi marca», «edítame este vídeo», «móntame el reel», «corta este bruto», «edítamelo viral», «sin preguntas», «modo prueba», «hazme variantes», «reels de prueba», «prueba otro gancho», «cámbiale el título», «quita esta parte», «hazlo más corto», «¿cuántos vídeos me quedan?», «rehaz mi onboarding», «cambia mis colores», «cambia mi letra», «Drazo no funciona» o «¿está bien instalado Drazo?».
+description: Editor de vídeo Drazo Pro. Úsala siempre que el usuario quiera editar o montar un vídeo, un bruto, un reel o una historia de Instagram («edítame el vídeo», «edita este bruto», «monta este vídeo», «edítame esta historia», «edítamelo viral»), cuando salude o empiece con Drazo («hola drazo», «empezar con drazo»), cuando quiera variantes, reels de prueba o un cambio de un vídeo ya hecho, cuando pregunte cuántos vídeos le quedan, cuando quiera configurar o cambiar su marca o rehacer su onboarding, o cuando Drazo dé un error. Va antes que las skills de HyperFrames o Tesseract, que solo se usan cuando lo indique el servidor de Drazo. El método lo da el servidor con sus herramientas; esta skill solo dice cómo usarlas.
+when_to_use: Frases como «hola drazo», «empezar con drazo», «configura mi marca», «edítame este vídeo», «móntame el reel», «edítame esta historia», «para mis historias», «stories», «corta este bruto», «edítamelo viral», «sin preguntas», «modo prueba», «hazme variantes», «reels de prueba», «prueba otro gancho», «cámbiale el título», «quita esta parte», «hazlo más corto», «¿cuántos vídeos me quedan?», «rehaz mi onboarding», «cambia mis colores», «cambia mi letra», «Drazo no funciona» o «¿está bien instalado Drazo?».
 allowed-tools: mcp__plugin_drazo_drazo__drazo_estado mcp__plugin_drazo_drazo__drazo_onboarding mcp__plugin_drazo_drazo__drazo_marca mcp__plugin_drazo_drazo__drazo_empezar mcp__plugin_drazo_drazo__drazo_guia mcp__plugin_drazo_drazo__drazo_motor mcp__plugin_drazo_drazo__drazo_direccion mcp__plugin_drazo_drazo__drazo_revisar mcp__plugin_drazo_drazo__drazo_variantes
 ---
 
@@ -28,6 +28,7 @@ El método de edición vive en el servidor de Drazo y llega por sus herramientas
 Con «hola drazo», «empezar con drazo» o «configura mi marca»: llama a `drazo_estado` y, si devuelve `onboarding_pendiente`, sigue `drazo_onboarding` con el usuario, con las preguntas de una en una y esperando cada respuesta. Si no está pendiente, salúdale, dile cuántos vídeos lleva este mes de su plan (`videos_este_mes` de `videos_mes_maximo`) y, en pocas líneas, lo que puede pedirte:
 
 - «Edítame el vídeo», con los brutos en esta carpeta y el guion pegado: un vídeo nuevo.
+- «Edítame esta historia»: una historia de Instagram, gratis y sin contar en su plan.
 - «Cámbiale…» (un texto, un color, quitar o acortar una parte, la música): un cambio del último vídeo.
 - «Hazme 3 variantes para reels de prueba»: otros arranques del mismo vídeo para probar cuál funciona.
 - «¿Cuántos vídeos me quedan?»: lo que lleva del mes y lo que incluye cada vídeo.
@@ -36,8 +37,11 @@ Con «hola drazo», «empezar con drazo» o «configura mi marca»: llama a `dra
 
 1. Llama a `drazo_estado`.
 2. Si devuelve `onboarding_pendiente`, haz primero el onboarding con `drazo_onboarding` (preguntas de una en una) antes de editar ningún vídeo.
-3. Antes de editar, pide siempre el guion del vídeo.
-4. Llama a `drazo_empezar` y sigue exactamente lo que devuelva: cada fase con `drazo_guia`, los motores con `drazo_motor`, la dirección con `drazo_direccion` y la revisión con `drazo_revisar`.
+3. **¿Historia o reel?** Si el usuario ya lo ha dicho, no preguntes: «historia», «historias», «story», «stories» o «para mis historias» es una historia; «reel», «para publicar», «para el feed», TikTok o Shorts es un reel. Si no lo ha dicho (por ejemplo, «edítame el vídeo»), pregúntale en una línea: «¿Es para una historia o para un reel?».
+4. En un reel, antes de editar pide siempre el guion del vídeo. En una historia, solo si lo tiene: no hace falta.
+5. Llama a `drazo_empezar` con `formato` («historia» o «reel») y sigue exactamente lo que devuelva: cada fase con `drazo_guia` y los motores con `drazo_motor`; en un reel, además, la dirección con `drazo_direccion` y la revisión con `drazo_revisar`.
+
+**Historias**: Drazo las edita en este ordenador sin su IA (sin dirección, revisión ni variantes del servidor), así que son gratis y no cuentan en su plan de vídeos. Su plan las monta con los motores de Drazo y los subtítulos de su marca; si el usuario quiere la dirección de Drazo, es un reel.
 
 **Carpetas**: el usuario encuentra sus vídeos editados en la carpeta `videos/` de la carpeta de Drazo (cada versión que le enseñes y el vídeo final); el trabajo de cada vídeo va en `proyectos/<video>/`. Si falta alguna, créala.
 
@@ -50,7 +54,7 @@ Es el mismo vídeo: se trabaja en su proyecto (`proyectos/<video>/`, con su `pro
 | Un texto, un color, quitar o acortar una parte, la música, los subtítulos | Cambio pequeño | En su proyecto: hazlo, renderiza y compruébalo en este ordenador (medidas y hoja de fotogramas), sin `drazo_direccion` ni `drazo_revisar` |
 | Otra estructura, otro orden, otro gancho para todo el vídeo, otra llamada final | Cambio grande | En su proyecto: `drazo_direccion` otra vez y las fases que cambien |
 | Variantes, otros arranques, «reels de prueba» | Variantes | `drazo_guia` con la fase `variantes` y `drazo_variantes`, una sola llamada para todas; salen como `videos/<video>-prueba-A.mp4`, `-B`… |
-| Un vídeo con brutos nuevos | Vídeo nuevo | `drazo_empezar`: cuenta en su plan del mes |
+| Un vídeo con brutos nuevos | Vídeo nuevo | `drazo_empezar` con su `formato`: un reel cuenta en su plan del mes; una historia, no |
 
 Ni los cambios ni las variantes cuentan como vídeos nuevos. Cada vídeo incluye dos cambios grandes, cuatro revisiones de Drazo y dos tandas de variantes; los cambios pequeños no tienen límite (los números de su plan, en `drazo_estado`). Si Drazo dice que algo se ha agotado, cuéntaselo con esas palabras y ofrécele lo que sí puede: un cambio pequeño, o empezar el vídeo de nuevo (cuenta como otro vídeo de su plan). Si el proyecto ya está cerrado (Drazo lo dice), empieza uno nuevo con `drazo_empezar`.
 
