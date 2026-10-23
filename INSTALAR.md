@@ -97,6 +97,12 @@ Díselo así: «¡Listo! Cierra la app de Claude del todo (en Mac, Cmd+Q; en Win
 
 Si el usuario pide actualizar Drazo, o Drazo dice que está desactualizado, sin preguntar: vuelve a descargar el instalador (paso 2, que trae el de siempre al día) y repite solo el paso 5 sin la clave (Windows: `INSTALAR -Si -Pasos registrar -Carpeta "$PWD"`; macOS: `INSTALAR --si --pasos registrar --carpeta "$PWD"`). Después pídele que cierre la app de Claude del todo (en Mac, Cmd+Q) y la vuelva a abrir.
 
+## Si Drazo avisa de que Node.js no tiene los parches
+
+Al abrir una conversación, Drazo avisa si el Node.js del equipo no tiene el último parche de seguridad de su rama. El aviso no impide editar. Si el usuario pide actualizarlo («actualiza el Node.js de Drazo»), sin preguntar: vuelve a descargar el instalador (paso 2) y pasa solo el paso `node` (Windows: `INSTALAR -Si -Pasos node`; macOS: `INSTALAR --si --pasos node`). Pone la última versión de Node.js 24 con sus parches. En Windows, avísale antes de la ventana «¿Quieres permitir que esta aplicación haga cambios?» («Sí»).
+
+Comprobación: `-> [node] ok`. Después pídele que cierre la app de Claude del todo y la vuelva a abrir.
+
 ## Si después de reiniciar Drazo no responde
 
 - Pasa el doctor (paso 6; antes, el paso 2 si el instalador ya no está).

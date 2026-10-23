@@ -67,7 +67,7 @@ La transcripción, el montaje y el render se hacen en tu equipo. Los reels que n
 
 ### Qué se instala
 
-- Git, Node.js, ffmpeg (la versión completa), Google Chrome y Python con un entorno propio de Drazo, que no toca tus otros programas. En Mac, sin contraseña de administrador: todo va en la carpeta de Drazo.
+- Git, Node.js 24 (siempre la última, con sus parches de seguridad), ffmpeg (la versión completa), Google Chrome y Python con un entorno propio de Drazo, que no toca tus otros programas. En Mac, sin contraseña de administrador: todo va en la carpeta de Drazo.
 - El modelo de transcripción (large-v3-turbo, unos 1,6 GB), para que la primera transcripción no tarde ni se corte.
 - HyperFrames, el motor con el que se montan los vídeos (su navegador y sus guías).
 - Las fuentes libres de las plantillas: Anton, Caveat, Poppins, Inter y JetBrains Mono (de Google Fonts, licencia OFL).
@@ -87,6 +87,7 @@ Lo de Drazo se guarda en su propia carpeta: `%LOCALAPPDATA%\Drazo` en Windows y 
 | Claude no conoce Drazo | Cierra la app del todo y vuelve a abrirla. Si sigue, vuelve a pegar el mensaje de instalación. |
 | Claude no consigue descargar un motor de Drazo | Cierra la app y vuelve a abrirla. Si sigue, pídele que compruebe la instalación. |
 | El render va muy lento o se corta | Cierra otros programas pesados y comprueba que tienes más de 10 GB libres. |
+| Drazo avisa de que tu Node.js no tiene el último parche de seguridad | Puedes seguir editando. Para ponerlo al día, dile a Claude «actualiza el Node.js de Drazo». |
 
 ## Contacto
 
