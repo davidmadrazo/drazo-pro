@@ -34,7 +34,8 @@ $ProgressPreference = 'SilentlyContinue'
 
 $FicherosPlugin = @(
     '.mcp.json', 'scripts/drazo-comun.ps1', 'scripts/drazo-doctor.ps1', 'scripts/comprobar-servidor.mjs',
-    'scripts/ajustes-claude.mjs', 'scripts/comprobar-python.py', 'scripts/requisitos-python.txt', 'scripts/fuentes.txt'
+    'scripts/ajustes-claude.mjs', 'scripts/node-parcheado.mjs', 'scripts/comprobar-python.py', 'scripts/requisitos-python.txt',
+    'scripts/fuentes.txt'
 )
 $CarpetaTemporal = $null
 $CodigoSalida = 1
@@ -68,12 +69,23 @@ function Preguntar([string]$Texto, [switch]$PorDefectoNo) {
 
 function Avisar([string]$Texto, [string]$Color = 'Yellow') { Write-Host $Texto -ForegroundColor $Color }
 
-function Instalar-ConWinget([string]$Id, [string]$Nombre) {
+function Instalar-ConWinget([string]$Id, [string]$Nombre, [string]$Version) {
     if (-not (Buscar-Comando 'winget')) { throw "sin winget no se puede instalar $Nombre; instala «Instalador de aplicación» desde Microsoft Store" }
     Write-Host "Instalando $Nombre con winget. Windows puede mostrar una ventana «¿Quieres permitir que esta aplicación haga cambios?»: hay que pulsar «Sí»."
-    & winget install --id $Id -e --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity
+    $fijar = if ($Version) { @('--version', $Version) } else { @() }
+    & winget install --id $Id -e @fijar --source winget --accept-package-agreements --accept-source-agreements --silent --disable-interactivity
     if ($LASTEXITCODE -ne 0) { Write-Host "winget terminó con el código $LASTEXITCODE." }
     Actualizar-Path
+}
+
+# Siempre la última 24.x, con la versión fijada: OpenJS.NodeJS.LTS a secas salta a la 26 el 28-oct-2026.
+# winget comprueba el SHA-256 del instalador con el de su manifiesto. Si Node ya estaba, lo actualiza.
+function Instalar-Node {
+    $v = Resolver-VersionNode
+    $r = Ejecutar 'winget' @('show', '--id', 'OpenJS.NodeJS.LTS', '-e', '--versions', '--source', 'winget', '--accept-source-agreements', '--disable-interactivity')
+    $enWinget = Elegir-VersionWinget $r.Lineas $v
+    if ($enWinget -ne $v) { Write-Host "winget aún no tiene Node.js ${v}: instalo la $enWinget, la última $RamaNode que tiene." }
+    Instalar-ConWinget 'OpenJS.NodeJS.LTS' "Node.js $enWinget" $enWinget
 }
 
 function Instalar-Claude {
@@ -228,7 +240,7 @@ function Comprobar-Registro {
 function Nuevo-Catalogo {
     [ordered]@{
         git        = @{ Comprobar = 'Comprobar-Git'; Hacer = { Instalar-ConWinget 'Git.Git' 'Git' }; Texto = 'Instalo Git (Claude lo usa para descargar Drazo y para su terminal Bash)' }
-        node       = @{ Comprobar = 'Comprobar-Node'; Hacer = { Instalar-ConWinget 'OpenJS.NodeJS.LTS' 'Node.js LTS' }; Texto = 'Instalo Node.js' }
+        node       = @{ Comprobar = 'Comprobar-Node'; Hacer = { Instalar-Node }; Texto = "Instalo Node.js $RamaNode (la última, con sus parches de seguridad)" }
         claude     = @{ Comprobar = 'Comprobar-Claude'; Hacer = { Instalar-Claude }; Texto = 'Instalo Claude Code (la orden claude)' }
         ffmpeg     = @{ Comprobar = 'Comprobar-Ffmpeg'; Hacer = { Instalar-ConWinget 'Gyan.FFmpeg' 'ffmpeg' }; Texto = 'Instalo ffmpeg completo (con libx264 y zscale)' }
         python     = @{ Comprobar = 'Comprobar-Python'; Hacer = { Instalar-ConWinget 'Python.Python.3.12' 'Python 3.12' }; Texto = 'Instalo Python 3.12' }
@@ -245,8 +257,9 @@ function Nuevo-Catalogo {
     }
 }
 
-# Un paso está hecho si no falta nada; Tesseract (opcional) solo si está del todo bien.
-function Esta-Hecho($Id, $R) { if ($Id -eq 'tesseract') { $R.Estado -eq 'ok' } else { $R.Estado -ne 'falta' } }
+# Un paso está hecho si no falta nada; Tesseract (opcional) y Node (sin el último parche es un aviso) solo si
+# están del todo bien.
+function Esta-Hecho($Id, $R) { if ($Id -in 'tesseract', 'node') { $R.Estado -eq 'ok' } else { $R.Estado -ne 'falta' } }
 
 function Principal {
     # Lo que instaló un paso anterior está en el registro, no en el PATH heredado de la app de Claude.
