@@ -14,11 +14,15 @@ DRAZO_UV="$DRAZO_DATOS/uv"
 DRAZO_ENTORNO="$DRAZO_DATOS/entorno.sh"
 AJUSTES_SCRIPT="$DRAZO_SCRIPTS/ajustes-claude.mjs"
 REQUISITOS_PYTHON="$DRAZO_SCRIPTS/requisitos-python.txt"
-# Node oficial (nodejs.org), uv (astral-sh/uv) y ffmpeg 9.0.2 estático de https://ffmpeg.martin-riedl.de
-# (zips firmados; traen libx264 y zimg para zscale): versiones fijas con su SHA-256.
-VERSION_NODE="24.21.0"
-SHA256_NODE_ARM64="bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057"
-SHA256_NODE_X86_64="1462cb3b3046b815cf8ea436d3da450ec1a9f11dac7e5a46b0ada5305d7e8097"
+# Node oficial de nodejs.org: siempre la última 24.x, que se mira al instalar en index.json y se comprueba con
+# el SHASUMS256.txt de su carpeta. Sin red, la de respaldo, con su SHA-256 fijado aquí.
+RAMA_NODE=24
+URL_NODE_DIST="https://nodejs.org/dist"
+VERSION_NODE_RESPALDO="24.22.1"
+SHA256_NODE_ARM64="89c682593d76cd44233fa53b1563264e7de9cbb189cad169135c5b4fadfbc0a7"
+SHA256_NODE_X86_64="d132557e7ee2b85af08b0c8c34338e65c6430f2238d01f727728ef42dc83b035"
+# uv (astral-sh/uv) y ffmpeg 9.0.2 estático de https://ffmpeg.martin-riedl.de (zips firmados; traen libx264 y
+# zimg para zscale): versiones fijas con su SHA-256.
 VERSION_UV="0.13.0"
 SHA256_UV_ARM64="a9c1b29002cf3c83f07fa9cd8a887a3be0107d90e23189721221e7257db8e3d6"
 SHA256_UV_X86_64="5f44dcbde809b632f47c36fadb241cb4d6f9af71d0c8f172b5d2026d3dde742c"
@@ -36,6 +40,7 @@ SHA256_TESSERACT_X86_64="15d33a41a90d62d5bcaffcab0410c732fbd77ee029a8d31e2541012
 TSRCT_RUTA="$HOME/Library/Application Support/Tesseract/bin/tsrct"
 SKILLS_TESSERACT="tesseract-video tesseract-motion"
 ID_PLUGIN="drazo@drazo"
+# Mínimo duro: la 22 tiene parches hasta el 30-abr-2027. Que vaya al día con ellos lo dice node-parcheado.mjs.
 NODE_MINIMO=22
 DISCO_MINIMO_GB=10
 COMPROBACIONES_DRAZO="sistema git node claude cuenta ffmpeg python venv modelo playwright chrome navegador skills fuentes telemetria tesseract licencia bash plugin disco memoria"
@@ -115,6 +120,33 @@ version_minima() {
         if [ "${a[$i]:-0}" -lt "${b[$i]:-0}" ] 2>/dev/null; then return 1; fi
     done
     return 0
+}
+
+# Primera versión de la rama $1 en el index.json de nodejs.org que entra por stdin (va de la más nueva a la
+# más vieja). Se lee como texto: el instalador lo necesita antes de que haya Node para leer JSON.
+elegir_version_node() {
+    grep -Eo "\"version\": *\"v$1\.[0-9]+\.[0-9]+\"" | head -n 1 | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+'
+}
+
+# La última 24.x publicada; sin red, o si index.json trae una más vieja, la de respaldo.
+version_node_a_instalar() {
+    local indice v
+    indice="$(curl -fsSL --max-time 20 "$URL_NODE_DIST/index.json" 2>/dev/null)"
+    v="$(printf '%s\n' "$indice" | elegir_version_node "$RAMA_NODE")"
+    if [ -z "$v" ] || ! version_minima "$v" "$VERSION_NODE_RESPALDO"; then v="$VERSION_NODE_RESPALDO"; fi
+    echo "$v"
+}
+
+# SHA-256 del fichero $2 de Node $1: el fijado para la versión de respaldo; para otra, la de SHASUMS256.txt.
+huella_node() {
+    if [ "$1" = "$VERSION_NODE_RESPALDO" ]; then
+        case "$2" in
+            *-darwin-arm64.tar.gz) echo "$SHA256_NODE_ARM64" ;;
+            *-darwin-x64.tar.gz) echo "$SHA256_NODE_X86_64" ;;
+        esac
+        return
+    fi
+    curl -fsSL --max-time 20 "$URL_NODE_DIST/v$1/SHASUMS256.txt" 2>/dev/null | awk -v f="$2" '$2 == f { print $1; exit }'
 }
 
 # Sin las herramientas de línea de órdenes de Xcode, /usr/bin/git y /usr/bin/python3 abren
@@ -254,12 +286,19 @@ comprobar_git() {
     resultado git "Git" ok "$(leer_version "$("$g" --version 2>/dev/null)")"
 }
 
+# Además del mínimo, mira si lleva el último parche de seguridad de su rama (node-parcheado.mjs, con caché de
+# 24 h; sin red no dice nada). Si no lo lleva es un aviso: no impide usar Drazo, y el paso «node» lo pone al día.
 comprobar_node() {
-    local nombre="Node.js 22 o superior" v
+    local nombre="Node.js 22 o superior" v parches estado parche
     if ! command -v node >/dev/null 2>&1; then resultado node "$nombre" falta "no está" "Lo instala el instalador de Drazo (Node oficial en la carpeta de Drazo, sin contraseña)."; return; fi
     v="$(leer_version "$(node --version 2>/dev/null)")"
-    if ! version_minima "$v" "$NODE_MINIMO"; then resultado node "$nombre" falta "versión $v" "El instalador de Drazo pone Node $VERSION_NODE en su carpeta."; return; fi
-    if ! command -v npm >/dev/null 2>&1; then resultado node "$nombre" falta "$v sin npm" "El instalador de Drazo pone Node $VERSION_NODE (con npm) en su carpeta."; return; fi
+    if ! version_minima "$v" "$NODE_MINIMO"; then resultado node "$nombre" falta "versión $v" "El instalador de Drazo pone Node.js $RAMA_NODE (la última, con sus parches) en su carpeta."; return; fi
+    if ! command -v npm >/dev/null 2>&1; then resultado node "$nombre" falta "$v sin npm" "El instalador de Drazo pone Node.js $RAMA_NODE (con npm) en su carpeta."; return; fi
+    parches="$(node "$DRAZO_SCRIPTS/node-parcheado.mjs" estado 2>/dev/null)"
+    estado="$(printf '%s\n' "$parches" | sed -n 's/^estado=//p')"
+    parche="$(printf '%s\n' "$parches" | sed -n 's/^parche=//p')"
+    if [ "$estado" = "atrasada" ]; then resultado node "$nombre" aviso "$v, sin el último parche de seguridad ($parche)" "Vuelve a pasar el paso «node» del instalador de Drazo: pone al día Node.js $RAMA_NODE en su carpeta."; return; fi
+    [ "$estado" = "al-dia" ] && v="$v, con los parches de seguridad al día"
     resultado node "$nombre" ok "$v"
 }
 

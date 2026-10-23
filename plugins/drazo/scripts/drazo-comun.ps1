@@ -16,6 +16,11 @@ $Sha256Tesseract  = '35822d306209476d5c80ac3fafed6be6110afd70840f6c7179e5a35caf5
 $TsrctRuta        = Join-Path $env:LOCALAPPDATA 'Tesseract\bin\tsrct.cmd'
 $SkillsTesseract  = @('tesseract-video', 'tesseract-motion')
 $IdPlugin         = 'drazo@drazo'
+# Node: siempre la última 24.x (se mira al instalar en index.json de nodejs.org; sin red, la de respaldo).
+# Mínimo duro 22, que tiene parches hasta el 30-abr-2027; que vaya al día con ellos lo dice node-parcheado.mjs.
+$RamaNode            = 24
+$UrlNodeDist         = 'https://nodejs.org/dist'
+$VersionNodeRespaldo = '24.22.1'
 $NodeMinimo       = [version]'22.0.0'
 $PythonMinimo     = [version]'3.10.0'
 $DiscoMinimoGB    = 10
@@ -53,6 +58,34 @@ function Leer-Version([string]$Texto) {
         return [version]("{0}.{1}.{2}" -f $Matches[1], $Matches[2], $parche)
     }
     $null
+}
+
+# Primera versión de la rama $Rama en el texto de index.json de nodejs.org (va de la más nueva a la más vieja).
+# Se lee como texto, igual que en Mac: ConvertFrom-Json de PowerShell 5.1 no pasa de 2 MB.
+function Elegir-VersionNode([string]$Texto, [int]$Rama = $RamaNode) {
+    if ($Texto -match ('"version":\s*"v(' + $Rama + '\.\d+\.\d+)"')) { return $Matches[1] }
+    $null
+}
+
+# La última 24.x publicada; sin red, o si index.json trae una más vieja, la de respaldo.
+# Se lee de RawContentStream: .Content solo es texto si el servidor dice que lo es.
+function Resolver-VersionNode {
+    $v = $null
+    try {
+        $r = Invoke-WebRequest -UseBasicParsing -Uri "$UrlNodeDist/index.json" -TimeoutSec 20
+        $v = Elegir-VersionNode ([Text.Encoding]::UTF8.GetString($r.RawContentStream.ToArray()))
+    } catch { }
+    if (-not $v -or [version]$v -lt [version]$VersionNodeRespaldo) { return $VersionNodeRespaldo }
+    $v
+}
+
+# winget publica cada versión de Node horas o días después que nodejs.org. De las líneas de «winget show
+# --versions»: la deseada si ya la tiene; si no, la última 24.x que tenga; si no se pueden leer, la deseada.
+function Elegir-VersionWinget([string[]]$Lineas, [string]$Deseada, [int]$Rama = $RamaNode) {
+    $hay = @($Lineas | ForEach-Object { "$_".Trim() } | Where-Object { $_ -match "^$Rama\.\d+\.\d+$" } |
+        ForEach-Object { [version]$_ } | Sort-Object -Descending)
+    if (-not $hay.Count -or $hay -contains [version]$Deseada) { return $Deseada }
+    "$($hay[0])"
 }
 
 function Buscar-Comando([string]$Nombre) {
@@ -228,14 +261,24 @@ function Comprobar-Git {
     Nuevo-Resultado 'git' 'Git' 'ok' ("" + (Leer-Version (Ejecutar $exe @('--version')).Texto))
 }
 
+# Además del mínimo, mira si lleva el último parche de seguridad de su rama (node-parcheado.mjs, con caché de
+# 24 h; sin red no dice nada). Si no lo lleva es un aviso: no impide usar Drazo, y el paso «node» lo pone al día.
+# Los arreglos no dicen «winget install OpenJS.NodeJS.LTS» a secas: desde el 28-oct-2026 eso instala la 26.
 function Comprobar-Node {
     $nombre = 'Node.js 22 o superior'
     $exe = Buscar-Comando 'node'
-    if (-not $exe) { return Nuevo-Resultado 'node' $nombre 'falta' 'no está' 'winget install --id OpenJS.NodeJS.LTS -e' }
+    if (-not $exe) { return Nuevo-Resultado 'node' $nombre 'falta' 'no está' "Lo instala el instalador de Drazo (paso «node»): Node.js $RamaNode, la última con sus parches." }
     $v = Leer-Version (Ejecutar $exe @('--version')).Texto
-    if (-not $v -or $v -lt $NodeMinimo) { return Nuevo-Resultado 'node' $nombre 'falta' "versión $v" 'Actualiza Node.js: winget install --id OpenJS.NodeJS.LTS -e' }
-    if (-not (Buscar-Comando 'npm.cmd')) { return Nuevo-Resultado 'node' $nombre 'falta' "$v sin npm" 'Reinstala Node.js: winget install --id OpenJS.NodeJS.LTS -e' }
-    Nuevo-Resultado 'node' $nombre 'ok' "$v"
+    if (-not $v -or $v -lt $NodeMinimo) { return Nuevo-Resultado 'node' $nombre 'falta' "versión $v" "Vuelve a pasar el paso «node» del instalador de Drazo: pone Node.js $RamaNode, la última con sus parches." }
+    if (-not (Buscar-Comando 'npm.cmd')) { return Nuevo-Resultado 'node' $nombre 'falta' "$v sin npm" "Vuelve a pasar el paso «node» del instalador de Drazo: reinstala Node.js $RamaNode con npm." }
+    $parches = @{}
+    foreach ($l in (Ejecutar $exe @((Join-Path $DrazoScripts 'node-parcheado.mjs'), 'estado')).Lineas) {
+        $i = $l.IndexOf('=')
+        if ($i -gt 0) { $parches[$l.Substring(0, $i)] = $l.Substring($i + 1) }
+    }
+    if ($parches['estado'] -eq 'atrasada') { return Nuevo-Resultado 'node' $nombre 'aviso' "$v, sin el último parche de seguridad ($($parches['parche']))" "Vuelve a pasar el paso «node» del instalador de Drazo: pone al día Node.js $RamaNode." }
+    $detalle = if ($parches['estado'] -eq 'al-dia') { "$v, con los parches de seguridad al día" } else { "$v" }
+    Nuevo-Resultado 'node' $nombre 'ok' $detalle
 }
 
 function Comprobar-Claude {

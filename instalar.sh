@@ -33,7 +33,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-FICHEROS_PLUGIN=".mcp.json scripts/drazo-comun.sh scripts/drazo-doctor.sh scripts/comprobar-servidor.mjs scripts/ajustes-claude.mjs scripts/comprobar-python.py scripts/requisitos-python.txt scripts/fuentes.txt"
+FICHEROS_PLUGIN=".mcp.json scripts/drazo-comun.sh scripts/drazo-doctor.sh scripts/comprobar-servidor.mjs scripts/ajustes-claude.mjs scripts/node-parcheado.mjs scripts/comprobar-python.py scripts/requisitos-python.txt scripts/fuentes.txt"
 CARPETA_TEMPORAL=""
 PLUGIN=""
 CODIGO=1
@@ -118,13 +118,21 @@ instalar_git() {
     return 4
 }
 
+# Siempre la última 24.x de nodejs.org, con su SHA-256 de SHASUMS256.txt. Si esa huella no se puede leer, la
+# versión de respaldo, con la suya fijada en drazo-comun.sh: nunca se instala un Node sin comprobar.
 instalar_node() {
-    local arq tar sha tmp
-    arq="$(arquitectura)"
-    if [ "$arq" = "arm64" ]; then tar="node-v$VERSION_NODE-darwin-arm64.tar.gz"; sha="$SHA256_NODE_ARM64"; else tar="node-v$VERSION_NODE-darwin-x64.tar.gz"; sha="$SHA256_NODE_X86_64"; fi
+    local arq v tar sha tmp
+    arq="$(arquitectura)"; [ "$arq" = "arm64" ] || arq="x64"
+    v="$(version_node_a_instalar)"
+    tar="node-v$v-darwin-$arq.tar.gz"
+    sha="$(huella_node "$v" "$tar")"
+    if [ -z "$sha" ]; then
+        echo "No pude leer la huella SHA-256 de Node.js $v: instalo la $VERSION_NODE_RESPALDO."
+        v="$VERSION_NODE_RESPALDO"; tar="node-v$v-darwin-$arq.tar.gz"; sha="$(huella_node "$v" "$tar")"
+    fi
     tmp="$(mktemp -d)"
-    echo "Descargando Node.js $VERSION_NODE (oficial de nodejs.org)..."
-    descargar_verificado "https://nodejs.org/dist/v$VERSION_NODE/$tar" "$tmp/$tar" "$sha" || { rm -rf "$tmp"; return 1; }
+    echo "Descargando Node.js $v (oficial de nodejs.org)..."
+    descargar_verificado "$URL_NODE_DIST/v$v/$tar" "$tmp/$tar" "$sha" || { rm -rf "$tmp"; return 1; }
     rm -rf "$DRAZO_NODEJS" && mkdir -p "$DRAZO_NODEJS"
     tar -xzf "$tmp/$tar" -C "$DRAZO_NODEJS" --strip-components 1
     rm -rf "$tmp"
@@ -315,7 +323,7 @@ instalar_registrar() {
 texto_paso() {
     case "$1" in
         git) echo "Instalo git (herramientas de desarrollo de Apple; Claude lo usa para descargar Drazo)" ;;
-        node) echo "Instalo Node.js $VERSION_NODE en la carpeta de Drazo" ;;
+        node) echo "Instalo Node.js $RAMA_NODE (la última, con sus parches de seguridad) en la carpeta de Drazo" ;;
         claude) echo "Instalo Claude Code (la orden claude)" ;;
         ffmpeg) echo "Instalo ffmpeg completo (con libx264 y zscale) en la carpeta de Drazo" ;;
         python) echo "Instalo uv, que trae el Python de Drazo" ;;
@@ -342,9 +350,13 @@ comprobar_paso() {
     esac
 }
 
-# Un paso está hecho si no falta nada; Tesseract (opcional) solo si está del todo bien.
+# Un paso está hecho si no falta nada; Tesseract (opcional) y Node (sin el último parche es un aviso) solo si
+# están del todo bien. $2: el estado que mirar (por defecto, el de la última comprobación).
 esta_hecho() {
-    if [ "$1" = "tesseract" ]; then [ "$RES_ESTADO" = "ok" ]; else [ "$RES_ESTADO" != "falta" ]; fi
+    case "$1" in
+        tesseract|node) [ "${2:-$RES_ESTADO}" = "ok" ] ;;
+        *) [ "${2:-$RES_ESTADO}" != "falta" ] ;;
+    esac
 }
 
 principal() {
@@ -372,7 +384,7 @@ principal() {
         for id in $PASOS_VALIDOS; do
             case "$id" in tesseract|registrar) continue ;; esac
             v="ESTADO_$id"
-            [ "${!v}" = "falta" ] && lista="$lista $id"
+            esta_hecho "$id" "${!v}" || lista="$lista $id"
         done
         [ "$SI" != "1" ] && [ "$ESTADO_tesseract" != "ok" ] && lista="$lista tesseract"
         if [ -n "$LICENCIA" ] || [ "$ESTADO_registrar" = "falta" ]; then lista="$lista registrar"; fi
