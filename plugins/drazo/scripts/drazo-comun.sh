@@ -158,11 +158,20 @@ arquitectura() {
     if [ "$(uname -m)" = "arm64" ] || [ "$(sysctl -in sysctl.proc_translated 2>/dev/null)" = "1" ]; then echo arm64; else echo x86_64; fi
 }
 
-# Node, ffmpeg y uv de Drazo en el PATH de este proceso (una terminal nueva los toma de entorno.sh).
+# $1 al principio del PATH, quitándolo de donde estuviera. No basta con añadirlo si falta: path_helper de macOS
+# y Homebrew lo mandan detrás de /usr/local/bin y /opt/homebrew/bin, y un Node o un ffmpeg de ahí ganaría al de Drazo.
+poner_delante() {
+    local p=":$PATH:"
+    while case "$p" in *":$1:"*) true ;; *) false ;; esac; do p="${p%%:"$1":*}:${p#*:"$1":}"; done
+    p="${p#:}"; p="${p%:}"
+    PATH="$1${p:+:$p}"
+}
+
+# Node, ffmpeg y uv de Drazo delante en el PATH de este proceso (una terminal nueva los toma de entorno.sh).
 cargar_rutas_drazo() {
     local d
     for d in "$DRAZO_FFMPEG" "$DRAZO_NODEJS/bin" "$DRAZO_UV"; do
-        case ":$PATH:" in *":$d:"*) ;; *) [ -d "$d" ] && PATH="$d:$PATH" ;; esac
+        [ -d "$d" ] && poner_delante "$d"
     done
     export PATH
 }
@@ -297,7 +306,7 @@ comprobar_node() {
     parches="$(node "$DRAZO_SCRIPTS/node-parcheado.mjs" estado 2>/dev/null)"
     estado="$(printf '%s\n' "$parches" | sed -n 's/^estado=//p')"
     parche="$(printf '%s\n' "$parches" | sed -n 's/^parche=//p')"
-    if [ "$estado" = "atrasada" ]; then resultado node "$nombre" aviso "$v, sin el último parche de seguridad ($parche)" "Vuelve a pasar el paso «node» del instalador de Drazo: pone al día Node.js $RAMA_NODE en su carpeta."; return; fi
+    if [ "$estado" = "atrasada" ]; then resultado node "$nombre" aviso "$v en $(command -v node), sin el último parche de seguridad ($parche)" "Vuelve a pasar el paso «node» del instalador de Drazo: pone al día Node.js $RAMA_NODE en su carpeta."; return; fi
     [ "$estado" = "al-dia" ] && v="$v, con los parches de seguridad al día"
     resultado node "$nombre" ok "$v"
 }

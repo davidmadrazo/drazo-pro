@@ -76,18 +76,26 @@ preguntar() {
     done
 }
 
-# entorno.sh solo lleva rutas (node, ffmpeg y uv de Drazo). Lo carga ~/.zshenv, que lee todo zsh (también
-# la terminal de Claude), y ~/.zshrc, que lo vuelve a cargar después del path_helper de macOS.
+# entorno.sh solo lleva rutas (node, ffmpeg y uv de Drazo) y las pone delante aunque ya estén en el PATH. Lo carga
+# ~/.zshenv, que lee todo zsh (también la terminal de Claude), y ~/.zprofile y ~/.zshrc lo vuelven a cargar después
+# del path_helper de macOS y de Homebrew, que mandan al final lo que ya estaba: si no, un Node viejo de
+# /usr/local/bin u /opt/homebrew/bin ganaría al de Drazo.
 asegurar_entorno() {
     local perfil linea='[ -f "$HOME/.local/share/drazo/entorno.sh" ] && . "$HOME/.local/share/drazo/entorno.sh"'
     mkdir -p "$DRAZO_DATOS"
-    {
-        printf '# Entorno de Drazo Pro: lo escribe el instalador de Drazo.\n'
-        printf 'for _d in "$HOME/.local/share/drazo/uv" "$HOME/.local/share/drazo/nodejs/bin" "$HOME/.local/share/drazo/ffmpeg"; do\n'
-        printf '    case ":$PATH:" in *":$_d:"*) ;; *) [ -d "$_d" ] && PATH="$_d:$PATH" ;; esac\n'
-        printf 'done\nunset _d\nexport PATH\n'
-    } > "$DRAZO_ENTORNO"
-    for perfil in "$HOME/.zshenv" "$HOME/.zshrc" "$HOME/.bash_profile"; do
+    cat > "$DRAZO_ENTORNO" <<'ENTORNO'
+# Entorno de Drazo Pro: lo escribe el instalador de Drazo. Pone sus rutas delante aunque ya estén en el PATH.
+for _d in "$HOME/.local/share/drazo/uv" "$HOME/.local/share/drazo/nodejs/bin" "$HOME/.local/share/drazo/ffmpeg"; do
+    [ -d "$_d" ] || continue
+    _p=":$PATH:"
+    while case "$_p" in *":$_d:"*) true ;; *) false ;; esac; do _p="${_p%%:"$_d":*}:${_p#*:"$_d":}"; done
+    _p="${_p#:}"; _p="${_p%:}"
+    PATH="$_d${_p:+:$_p}"
+done
+unset _d _p
+export PATH
+ENTORNO
+    for perfil in "$HOME/.zshenv" "$HOME/.zprofile" "$HOME/.zshrc" "$HOME/.bash_profile"; do
         if [ "$perfil" = "$HOME/.bash_profile" ] && [ ! -f "$perfil" ]; then continue; fi
         grep -qF '.local/share/drazo/entorno.sh' "$perfil" 2>/dev/null && continue
         printf '\n# Drazo Pro\n%s\n' "$linea" >> "$perfil"
