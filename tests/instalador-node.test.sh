@@ -50,6 +50,39 @@ igual "fichero que no está en SHASUMS256.txt" "$(huella_node 24.22.1 node-v24.2
 URL_NODE_DIST="$SIN_RED"
 igual "sin red y sin huella fijada, nada" "$(huella_node 24.22.1 node-v24.22.1-darwin-x64.tar.gz)" ""
 
+# Orden del PATH. En Mac, path_helper (/etc/zprofile) y Homebrew mandan detrás lo que .zshenv puso delante: con
+# otro Node en /usr/local/bin u /opt/homebrew/bin, ese ganaba al de Drazo y el aviso de Node no se iba nunca.
+cuenta() { printf '%s' ":$1:" | awk -v d=":$2:" '{ n = 0; while ((i = index($0, d)) > 0) { n++; $0 = substr($0, i + 1) } print n }'; }
+tmp="$(mktemp -d)"
+casa="$tmp/casa"
+datos="$casa/.local/share/drazo"
+mkdir -p "$datos/uv" "$datos/nodejs/bin" "$datos/ffmpeg" "$tmp/viejo"
+printf '#!/bin/sh\necho drazo\n' > "$datos/nodejs/bin/node"
+printf '#!/bin/sh\necho viejo\n' > "$tmp/viejo/node"
+chmod +x "$datos/nodejs/bin/node" "$tmp/viejo/node"
+# El entorno.sh que escribe de verdad asegurar_entorno (instalar.sh), sacado tal cual de su heredoc
+awk '/<<.ENTORNO.$/ { dentro = 1; next } /^ENTORNO$/ { dentro = 0 } dentro' "$raiz/instalar.sh" > "$datos/entorno.sh"
+igual "instalar.sh escribe entorno.sh" "$(grep -c 'nodejs/bin' "$datos/entorno.sh")" "1"
+# Como queda tras path_helper: el Node viejo y el sistema delante, la carpeta de Drazo al final
+tras_path_helper="$tmp/viejo:$PATH:$datos/nodejs/bin:$datos/uv"
+for sh_prueba in bash sh dash zsh; do
+    command -v "$sh_prueba" >/dev/null 2>&1 || { echo "salto $sh_prueba (no está)"; continue; }
+    salida="$(HOME="$casa" PATH="$tras_path_helper" "$sh_prueba" -c '. "$HOME/.local/share/drazo/entorno.sh"; . "$HOME/.local/share/drazo/entorno.sh"; printf "%s\n%s\n" "$(node)" "$PATH"')"
+    ruta="$(printf '%s\n' "$salida" | sed -n 2p)"
+    igual "$sh_prueba: tras path_helper, node es el de Drazo" "$(printf '%s\n' "$salida" | sed -n 1p)" "drazo"
+    igual "$sh_prueba: las tres carpetas de Drazo, delante" "${ruta%%:$tmp/viejo:*}" "$datos/ffmpeg:$datos/nodejs/bin:$datos/uv"
+    igual "$sh_prueba: cargado dos veces, nodejs/bin sale una sola vez" "$(cuenta "$ruta" "$datos/nodejs/bin")" "1"
+    igual "$sh_prueba: no se pierde nada del PATH" "${ruta#*:$tmp/viejo:}" "$PATH"
+done
+# cargar_rutas_drazo, en el proceso del instalador, hace lo mismo
+salida="$(DRAZO_FFMPEG="$datos/ffmpeg" DRAZO_NODEJS="$datos/nodejs" DRAZO_UV="$datos/uv" PATH="$tras_path_helper" bash -c '. "$1"; DRAZO_FFMPEG="$2/ffmpeg"; DRAZO_NODEJS="$2/nodejs"; DRAZO_UV="$2/uv"; cargar_rutas_drazo; cargar_rutas_drazo; printf "%s\n%s\n" "$(node)" "$PATH"' _ "$raiz/plugins/drazo/scripts/drazo-comun.sh" "$datos")"
+igual "cargar_rutas_drazo: node es el de Drazo" "$(printf '%s\n' "$salida" | sed -n 1p)" "drazo"
+igual "cargar_rutas_drazo: nodejs/bin una sola vez" "$(cuenta "$(printf '%s\n' "$salida" | sed -n 2p)" "$datos/nodejs/bin")" "1"
+# Sin la carpeta de Drazo, entorno.sh no añade nada
+salida="$(HOME="$tmp/otra" PATH="/usr/bin:/bin" sh -c '. "$1"; printf "%s" "$PATH"' _ "$datos/entorno.sh")"
+igual "sin carpetas de Drazo, el PATH no cambia" "$salida" "/usr/bin:/bin"
+rm -rf "$tmp"
+
 echo ""
 if [ "$fallos" -eq 0 ]; then echo "Todas las pruebas pasan."; exit 0; fi
 echo "$fallos pruebas fallan."

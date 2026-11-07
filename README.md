@@ -95,7 +95,7 @@ Soporte de **ProfimaxIA**: escríbenos a davidmadrazo@profimaxia.com o por el Wh
 
 ## Desinstalar
 
-Pídele a Claude: «Desinstala Drazo Pro: quita sus entradas de mis ajustes de Claude (extraKnownMarketplaces.drazo, enabledPlugins drazo@drazo y pluginConfigs drazo@drazo) con copia de seguridad, y borra la carpeta de Drazo». En Mac, que quite también las líneas «Drazo Pro» de `~/.zshenv` y `~/.zshrc`.
+Pídele a Claude: «Desinstala Drazo Pro: quita sus entradas de mis ajustes de Claude (extraKnownMarketplaces.drazo, enabledPlugins drazo@drazo y pluginConfigs drazo@drazo) con copia de seguridad, y borra la carpeta de Drazo». En Mac, que quite también las líneas «Drazo Pro» de `~/.zshenv`, `~/.zprofile` y `~/.zshrc`.
 
 ## Alternativa: instalar desde la terminal
 

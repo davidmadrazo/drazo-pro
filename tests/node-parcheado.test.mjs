@@ -9,7 +9,7 @@ import { dirname, join } from "node:path"
 import { after, before, test } from "node:test"
 import { fileURLToPath } from "node:url"
 import {
-  estadoNode, principal, resumirIndice, salidaHook, seguridadPorRama, VIGENCIA_MS,
+  carpetaDrazo, estadoNode, principal, resumirIndice, salidaHook, seguridadPorRama, VIGENCIA_MS,
 } from "../plugins/drazo/scripts/node-parcheado.mjs"
 
 const textoIndice = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "fixtures", "nodejs-dist", "index.json"), "utf8")
@@ -52,6 +52,12 @@ test("rama 24 atrasada: aviso con la versión que trae el parche", () => {
   assert.match(hook.systemMessage, /actualiza el Node\.js de Drazo/)
   assert.equal(hook.hookSpecificOutput.hookEventName, "SessionStart")
   assert.match(hook.hookSpecificOutput.additionalContext, /no bloquea nada/)
+  // La ruta del Node comprobado solo la ve Claude, y dice si es el de la carpeta de Drazo
+  const otro = JSON.parse(salidaHook(estadoNode(seguridad, "v24.21.0"), "/usr/local/bin/node"))
+  assert.match(otro.hookSpecificOutput.additionalContext, /\/usr\/local\/bin\/node, no el de la carpeta de Drazo/)
+  assert.doesNotMatch(otro.systemMessage, /usr\/local/)
+  const propio = JSON.parse(salidaHook(estadoNode(seguridad, "v24.21.0"), join(carpetaDrazo(), "nodejs", "bin", "node")))
+  assert.match(propio.hookSpecificOutput.additionalContext, /, el de la carpeta de Drazo/)
 })
 
 test("rama 22 al día y una versión posterior al parche: sin aviso", () => {

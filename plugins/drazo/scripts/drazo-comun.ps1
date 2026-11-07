@@ -276,7 +276,7 @@ function Comprobar-Node {
         $i = $l.IndexOf('=')
         if ($i -gt 0) { $parches[$l.Substring(0, $i)] = $l.Substring($i + 1) }
     }
-    if ($parches['estado'] -eq 'atrasada') { return Nuevo-Resultado 'node' $nombre 'aviso' "$v, sin el último parche de seguridad ($($parches['parche']))" "Vuelve a pasar el paso «node» del instalador de Drazo: pone al día Node.js $RamaNode." }
+    if ($parches['estado'] -eq 'atrasada') { return Nuevo-Resultado 'node' $nombre 'aviso' "$v en $exe, sin el último parche de seguridad ($($parches['parche']))" "Vuelve a pasar el paso «node» del instalador de Drazo: pone al día Node.js $RamaNode." }
     $detalle = if ($parches['estado'] -eq 'al-dia') { "$v, con los parches de seguridad al día" } else { "$v" }
     Nuevo-Resultado 'node' $nombre 'ok' $detalle
 }

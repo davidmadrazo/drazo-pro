@@ -1,5 +1,7 @@
 // Comprueba que el servidor de Drazo responde a drazo_estado con la licencia guardada en Claude Code
-// (pluginConfigs de settings.json, lo mismo que usa el plugin) y la misma URL que el plugin (../.mcp.json).
+// (pluginConfigs de settings.json, lo mismo que usa el plugin), la misma URL que el plugin y su versión en la
+// cabecera X-Drazo-Plugin (../.mcp.json): sin ella el servidor cree que el plugin es anterior a la 0.5.3 y pide
+// actualizar aunque esté al día.
 // Salida: una línea de resumen y, si hay, el detalle. La clave nunca se imprime.
 // Códigos: 0 responde bien · 1 responde pero rechaza (licencia u otro error) · 2 no disponible · 3 sin clave.
 import { readFileSync } from "node:fs"
@@ -23,12 +25,13 @@ class Fin extends Error {
   }
 }
 
-function urlDelPlugin() {
+function servidorDelPlugin() {
   try {
     const ruta = join(dirname(fileURLToPath(import.meta.url)), "..", ".mcp.json")
-    return JSON.parse(readFileSync(ruta, "utf8")).mcpServers.drazo.url || URL_POR_DEFECTO
+    const servidor = JSON.parse(readFileSync(ruta, "utf8")).mcpServers.drazo
+    return { url: servidor.url || URL_POR_DEFECTO, version: servidor.headers?.["X-Drazo-Plugin"] || "" }
   } catch {
-    return URL_POR_DEFECTO
+    return { url: URL_POR_DEFECTO, version: "" }
   }
 }
 
@@ -56,7 +59,7 @@ function textoDeError(cuerpo, texto) {
   return cuerpo?.message || texto || ""
 }
 
-const url = urlDelPlugin()
+const { url, version: versionPlugin } = servidorDelPlugin()
 let clave = ""
 let errorAjustes = ""
 try { clave = licenciaGuardada(leerAjustes()) } catch (err) { errorAjustes = err.message }
@@ -73,6 +76,7 @@ async function llamar(metodo, params, esNotificacion = false) {
     Authorization: `Bearer ${clave}`,
     "MCP-Protocol-Version": PROTOCOLO,
   }
+  if (versionPlugin) cabeceras["X-Drazo-Plugin"] = versionPlugin
   if (sesion) cabeceras["Mcp-Session-Id"] = sesion
   let res
   try {

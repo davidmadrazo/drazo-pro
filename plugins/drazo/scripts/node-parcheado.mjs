@@ -76,15 +76,18 @@ export function mensajeAviso({ estado, actual, parche }) {
   return ""
 }
 
-// Salida del hook SessionStart: systemMessage lo ve el usuario y additionalContext, Claude.
-export function salidaHook(r) {
+// Salida del hook SessionStart: systemMessage lo ve el usuario y additionalContext, Claude. La ruta del Node
+// comprobado solo va a Claude: si no es el de la carpeta de Drazo, el aviso viene de otro Node que va delante.
+export function salidaHook(r, ruta = process.execPath) {
   const mensaje = mensajeAviso(r)
   if (!mensaje) return ""
+  const deDrazo = ruta.startsWith(carpetaDrazo())
+  const cual = `El Node.js comprobado es ${ruta}${deDrazo ? ", el de la carpeta de Drazo" : ", no el de la carpeta de Drazo"}.`
   return JSON.stringify({
     systemMessage: mensaje,
     hookSpecificOutput: {
       hookEventName: "SessionStart",
-      additionalContext: `${mensaje} Es un aviso, no bloquea nada: cuéntaselo al usuario en una frase y en su idioma la primera vez que le respondas, y sigue con lo que pida. Si quiere actualizarlo, sigue la sección «Si Drazo avisa de que Node.js no tiene los parches» de ${URL_INSTALAR}.`,
+      additionalContext: `${mensaje} ${cual} Es un aviso, no bloquea nada: cuéntaselo al usuario en una frase y en su idioma la primera vez que le respondas, y sigue con lo que pida. Si quiere actualizarlo, sigue la sección «Si Drazo avisa de que Node.js no tiene los parches» de ${URL_INSTALAR}.`,
     },
   })
 }
