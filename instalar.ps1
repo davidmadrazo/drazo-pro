@@ -35,7 +35,7 @@ $ProgressPreference = 'SilentlyContinue'
 $FicherosPlugin = @(
     '.mcp.json', 'scripts/drazo-comun.ps1', 'scripts/drazo-doctor.ps1', 'scripts/comprobar-servidor.mjs',
     'scripts/ajustes-claude.mjs', 'scripts/node-parcheado.mjs', 'scripts/comprobar-python.py', 'scripts/requisitos-python.txt',
-    'scripts/fuentes.txt'
+    'scripts/fuentes.txt', 'agents/drazo-director.md', 'agents/drazo-revisor.md'
 )
 $CarpetaTemporal = $null
 $CodigoSalida = 1
