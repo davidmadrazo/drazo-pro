@@ -68,7 +68,7 @@ for (const [nombre, herramientas] of Object.entries(ESPERADAS)) {
 
   test(`${nombre}: acotado a su petición y su destino, y con los campos que acepta el servidor`, () => {
     const { cuerpo } = leer(nombre)
-    for (const frase of ["solo el fichero de petición", "solo el fichero de destino", "Ningún otro fichero", "no forma parte del encargo"]) {
+    for (const frase of ["solo el fichero de petición", "solo el fichero de destino", "Ningún otro fichero", "no forma parte del encargo", "el primero es el texto que se guarda", "se cuenta desde la carpeta del vídeo", "si el fichero de destino ya existe"]) {
       assert.ok(cuerpo.includes(frase), `falta «${frase}»`)
     }
     if (nombre === "drazo-revisor") {

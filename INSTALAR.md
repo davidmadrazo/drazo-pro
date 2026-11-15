@@ -76,7 +76,7 @@ Di algo como: «Ahora conecto Drazo con tu Claude, guardo tu clave y preparo est
 
 `$PWD` es la carpeta de esta conversación: la que el usuario eligió para Drazo.
 
-El paso `registrar` deja además permitidas en los ajustes del usuario las herramientas de Drazo (`permissions.allow`, sin tocar sus otras reglas, con copia de seguridad). El plugin (0.6.0) trae dos ayudantes internos, `drazo-director` y `drazo-revisor`, que Claude lanza solo cuando hace falta: no hay nada que configurar.
+El paso `registrar` deja además permitidas en los ajustes del usuario las herramientas de Drazo (`permissions.allow`, sin tocar sus otras reglas, con copia de seguridad). El plugin (0.6.1) trae dos ayudantes internos, `drazo-director` y `drazo-revisor`, que Claude lanza solo cuando hace falta: no hay nada que configurar.
 
 Comprobación: `-> [registrar] ok: registrado y descargado`, y en esta carpeta, `videos` y `CLAUDE.md`. Si los ajustes no son JSON válido, el instalador no los toca: díselo al usuario y ofrécele el soporte.
 
