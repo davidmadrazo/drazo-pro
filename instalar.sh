@@ -33,7 +33,7 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-FICHEROS_PLUGIN=".mcp.json scripts/drazo-comun.sh scripts/drazo-doctor.sh scripts/comprobar-servidor.mjs scripts/ajustes-claude.mjs scripts/node-parcheado.mjs scripts/comprobar-python.py scripts/requisitos-python.txt scripts/fuentes.txt"
+FICHEROS_PLUGIN=".mcp.json scripts/drazo-comun.sh scripts/drazo-doctor.sh scripts/comprobar-servidor.mjs scripts/ajustes-claude.mjs scripts/node-parcheado.mjs scripts/comprobar-python.py scripts/requisitos-python.txt scripts/fuentes.txt agents/drazo-director.md agents/drazo-revisor.md"
 CARPETA_TEMPORAL=""
 PLUGIN=""
 CODIGO=1

@@ -4,7 +4,7 @@
 // actualizar aunque esté al día.
 // Salida: una línea de resumen y, si hay, el detalle. La clave nunca se imprime.
 // Códigos: 0 responde bien · 1 responde pero rechaza (licencia u otro error) · 2 no disponible · 3 sin clave.
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { leerAjustes, licenciaGuardada } from "./ajustes-claude.mjs"
@@ -12,9 +12,18 @@ import { leerAjustes, licenciaGuardada } from "./ajustes-claude.mjs"
 const URL_POR_DEFECTO = "https://drazo.vercel.app/api/mcp"
 const HERRAMIENTAS = [
   "drazo_estado", "drazo_onboarding", "drazo_marca", "drazo_empezar",
-  "drazo_guia", "drazo_motor", "drazo_direccion", "drazo_revisar",
+  "drazo_guia", "drazo_motor", "drazo_direccion", "drazo_revisar", "drazo_variantes",
 ]
+// Las dos del modo cliente: el servidor puede desplegarse antes o después que el plugin, así que su falta es un aviso, no un fallo.
+const HERRAMIENTAS_NUEVAS = ["drazo_encargo", "drazo_entregar"]
+const AGENTES = ["drazo-director.md", "drazo-revisor.md"]
 const PROTOCOLO = "2025-06-18"
+
+// Los ficheros de agents/ viven junto al plugin. Si el doctor corre desde una copia suelta sin esa carpeta, no se puede decir.
+function agentesQueFaltan() {
+  const carpeta = join(dirname(fileURLToPath(import.meta.url)), "..", "agents")
+  return AGENTES.filter((f) => !existsSync(join(carpeta, f)))
+}
 
 // Se lanza para terminar; no se usa process.exit porque en Windows rompe Node con fetch a medio cerrar.
 class Fin extends Error {
@@ -118,6 +127,8 @@ async function principal() {
   const lista = resultado(await llamar("tools/list", {}), "tools/list")
   const nombres = (lista?.tools || []).map((t) => t.name)
   const faltan = HERRAMIENTAS.filter((n) => !nombres.includes(n))
+  const faltanNuevas = HERRAMIENTAS_NUEVAS.filter((n) => !nombres.includes(n))
+  const sinAgentes = agentesQueFaltan()
 
   const estado = resultado(await llamar("tools/call", { name: "drazo_estado", arguments: {} }), "drazo_estado")
   const texto = (estado?.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n")
@@ -126,7 +137,11 @@ async function principal() {
     await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${clave}`, "Mcp-Session-Id": sesion }, signal: AbortSignal.timeout(5000) }).catch(() => {})
   }
   const servidor = inicio?.serverInfo ? `${inicio.serverInfo.name} ${inicio.serverInfo.version || ""}`.trim() : "servidor MCP"
-  const aviso = faltan.length ? ` Faltan herramientas en el servidor: ${faltan.join(", ")}.` : ""
+  const aviso = [
+    faltan.length ? ` Faltan herramientas en el servidor: ${faltan.join(", ")}.` : "",
+    faltanNuevas.length ? ` Aviso: el servidor aún no tiene ${faltanNuevas.join(" ni ")} (solo hacen falta en el modo cliente).` : "",
+    sinAgentes.length ? ` Aviso: faltan los ayudantes del plugin (${sinAgentes.join(", ")}); actualiza Drazo.` : "",
+  ].join("")
   if (estado?.isError) throw new Fin(1, `El servidor de Drazo responde (${servidor}), pero drazo_estado devuelve un error.${aviso}`, texto)
   throw new Fin(0, `El servidor de Drazo responde (${servidor}) y acepta tu clave.${aviso}`, texto)
 }

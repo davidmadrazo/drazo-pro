@@ -20,6 +20,15 @@ export const ID_PLUGIN = "drazo@drazo"
 export const MARKETPLACE = "drazo"
 export const REPO = "davidmadrazo/drazo-pro"
 const ESPERA_MCP_MS = 900_000
+// Nombre de las herramientas de un servidor MCP de plugin: mcp__plugin_<plugin>_<servidor>__<herramienta>
+const PREFIJO_MCP = "mcp__plugin_drazo_drazo__"
+export const HERRAMIENTAS_DRAZO = [
+  "drazo_estado", "drazo_onboarding", "drazo_marca", "drazo_empezar", "drazo_guia", "drazo_motor",
+  "drazo_direccion", "drazo_revisar", "drazo_variantes", "drazo_encargo", "drazo_entregar",
+]
+// Las únicas que llaman los ayudantes (subagentes) del plugin: son las que se permiten de antemano
+export const HERRAMIENTAS_AYUDANTE = ["drazo_direccion", "drazo_revisar", "drazo_variantes", "drazo_encargo", "drazo_entregar"]
+export const PERMISOS_DRAZO = HERRAMIENTAS_AYUDANTE.map((h) => PREFIJO_MCP + h)
 
 export const carpetaConfig = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude")
 export const rutaAjustes = () => join(carpetaConfig(), "settings.json")
@@ -50,6 +59,16 @@ function seccion(a, nombre) {
   return a[nombre]
 }
 
+// Un subagente de plugin no puede traer su propio modo de permisos: las reglas de permissions.allow valen para
+// toda la sesión. Se añaden solo las de las herramientas que usan los ayudantes, sin duplicar y sin tocar las que el
+// usuario ya tenga; las demás herramientas de Drazo siguen pidiendo permiso como siempre.
+export function permitirHerramientas(a) {
+  const permisos = seccion(a, "permissions")
+  if (!Array.isArray(permisos.allow)) permisos.allow = []
+  for (const regla of PERMISOS_DRAZO) if (!permisos.allow.includes(regla)) permisos.allow.push(regla)
+  return a
+}
+
 export function registrar(a, { licencia, fuenteLocal }) {
   const fuente = fuenteLocal ? { source: "directory", path: resolve(fuenteLocal) } : { source: "github", repo: REPO }
   seccion(a, "extraKnownMarketplaces")[MARKETPLACE] = { source: fuente, autoUpdate: true }
@@ -60,6 +79,7 @@ export function registrar(a, { licencia, fuenteLocal }) {
     const opciones = esObjeto(actual.options) ? actual.options : {}
     configs[ID_PLUGIN] = { ...actual, options: { ...opciones, licencia } }
   }
+  permitirHerramientas(a)
   const env = seccion(a, "env")
   env.CLAUDE_CODE_PLUGIN_PREFER_HTTPS = "1"
   // La dirección de un vídeo tarda 3-4 min en el servidor (puede llegar a 13): que Claude Code la espere entera
