@@ -16,7 +16,12 @@ after(() => carpetas.forEach((c) => rmSync(c, { recursive: true, force: true }))
 
 test("son las 11 herramientas, con el nombre que Claude Code da a las de un plugin", () => {
   assert.equal(HERRAMIENTAS_DRAZO.length, 11)
-  assert.equal(PERMISOS_DRAZO.length, 11)
+  assert.equal(PERMISOS_DRAZO.length, 5)
+  // Solo las que llaman los ayudantes: las demás siguen pidiendo permiso como siempre
+  assert.deepEqual(
+    PERMISOS_DRAZO.map((p) => p.replace("mcp__plugin_drazo_drazo__", "")),
+    ["drazo_direccion", "drazo_revisar", "drazo_variantes", "drazo_encargo", "drazo_entregar"],
+  )
   assert.ok(PERMISOS_DRAZO.every((p) => /^mcp__plugin_drazo_drazo__drazo_[a-z]+$/.test(p)))
 })
 

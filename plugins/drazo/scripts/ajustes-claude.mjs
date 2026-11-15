@@ -26,7 +26,9 @@ export const HERRAMIENTAS_DRAZO = [
   "drazo_estado", "drazo_onboarding", "drazo_marca", "drazo_empezar", "drazo_guia", "drazo_motor",
   "drazo_direccion", "drazo_revisar", "drazo_variantes", "drazo_encargo", "drazo_entregar",
 ]
-export const PERMISOS_DRAZO = HERRAMIENTAS_DRAZO.map((h) => PREFIJO_MCP + h)
+// Las únicas que llaman los ayudantes (subagentes) del plugin: son las que se permiten de antemano
+export const HERRAMIENTAS_AYUDANTE = ["drazo_direccion", "drazo_revisar", "drazo_variantes", "drazo_encargo", "drazo_entregar"]
+export const PERMISOS_DRAZO = HERRAMIENTAS_AYUDANTE.map((h) => PREFIJO_MCP + h)
 
 export const carpetaConfig = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude")
 export const rutaAjustes = () => join(carpetaConfig(), "settings.json")
@@ -58,7 +60,8 @@ function seccion(a, nombre) {
 }
 
 // Un subagente de plugin no puede traer su propio modo de permisos: las reglas de permissions.allow valen para
-// toda la sesión. Se añaden las de Drazo sin duplicar y sin tocar las que el usuario ya tenga.
+// toda la sesión. Se añaden solo las de las herramientas que usan los ayudantes, sin duplicar y sin tocar las que el
+// usuario ya tenga; las demás herramientas de Drazo siguen pidiendo permiso como siempre.
 export function permitirHerramientas(a) {
   const permisos = seccion(a, "permissions")
   if (!Array.isArray(permisos.allow)) permisos.allow = []

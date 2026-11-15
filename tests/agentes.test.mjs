@@ -28,6 +28,9 @@ function leer(nombre) {
     assert.ok(kv, `${nombre}: línea de frontmatter no válida: ${linea}`)
     if (kv[2] === "") { lista = campos[kv[1]] = [] } else { lista = null; campos[kv[1]] = kv[2].trim() }
   }
+  // tools va en una línea, separadas por comas: la forma que usan los agentes de los plugins de Claude Code
+  assert.equal(typeof campos.tools, "string", `${nombre}: tools va en una sola línea, separadas por comas`)
+  campos.tools = campos.tools.split(",").map((t) => t.trim()).filter(Boolean)
   return { campos, cuerpo: m[2] }
 }
 
@@ -60,6 +63,17 @@ for (const [nombre, herramientas] of Object.entries(ESPERADAS)) {
     const { cuerpo } = leer(nombre)
     for (const frase of ["encargo: true", "al pie de la letra", "exactamente", "confidencial", "tal cual"]) {
       assert.ok(cuerpo.includes(frase), `falta «${frase}»`)
+    }
+  })
+
+  test(`${nombre}: acotado a su petición y su destino, y con los campos que acepta el servidor`, () => {
+    const { cuerpo } = leer(nombre)
+    for (const frase of ["solo el fichero de petición", "solo el fichero de destino", "Ningún otro fichero", "no forma parte del encargo"]) {
+      assert.ok(cuerpo.includes(frase), `falta «${frase}»`)
+    }
+    if (nombre === "drazo-revisor") {
+      assert.ok(cuerpo.includes("`descripcion_corte`"))
+      assert.ok(!cuerpo.includes("`descripcion`") && !cuerpo.includes("`notas`"), "campos que drazo_revisar no acepta")
     }
   })
 }
