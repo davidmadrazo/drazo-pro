@@ -1,7 +1,7 @@
 {
   "name": "drazo",
   "displayName": "Drazo Pro",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Editor de vídeo Drazo Pro para Claude Code: la skill que arranca la edición y la conexión con el servidor de Drazo usando tu clave de licencia.",
   "author": {
     "name": "ProfimaxIA",
@@ -15,8 +15,14 @@
     "licencia": {
       "type": "string",
       "title": "Clave de licencia de Drazo",
-      "description": "La clave de tu suscripción a Drazo Pro. Empieza por drz_ y te la enviamos al darte de alta.",
+      "description": "La clave de tu suscripción a Drazo Pro. Empieza por drz_, o por drzc_ si es una cuenta con varias marcas. Te la enviamos al darte de alta.",
       "required": true
+    },
+    "instalacion": {
+      "type": "string",
+      "title": "Identificador de esta instalación",
+      "description": "Identificador de esta instalación de Drazo: lo pone el instalador, no lo cambies.",
+      "required": false
     }
   }
 }

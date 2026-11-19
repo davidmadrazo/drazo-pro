@@ -424,7 +424,7 @@ function Comprobar-Licencia {
     if (-not $e) { return Nuevo-Resultado 'licencia' $nombre 'falta' 'sin Node.js no se pueden leer los ajustes de Claude' 'Instala Node.js con el instalador de Drazo.' }
     if ($e['ajustes'] -eq 'json-invalido') { return Nuevo-Resultado 'licencia' $nombre 'falta' 'los ajustes de Claude no se pueden leer' "Revisa el fichero: $($e['detalle'])" }
     if ($e['licencia'] -ne 'si') { return Nuevo-Resultado 'licencia' $nombre 'falta' 'no está guardada' 'Guárdala con el paso «registrar» del instalador de Drazo y tu clave drz_.' }
-    if ($e['licencia_formato'] -ne 'si') { return Nuevo-Resultado 'licencia' $nombre 'aviso' 'no empieza por drz_' 'Revisa que guardaste la clave completa de Drazo.' }
+    if ($e['licencia_formato'] -ne 'si') { return Nuevo-Resultado 'licencia' $nombre 'aviso' 'no empieza por drz_ ni drzc_' 'Revisa que guardaste la clave completa de Drazo.' }
     Nuevo-Resultado 'licencia' $nombre 'ok' $e['licencia_tapada']
 }
 

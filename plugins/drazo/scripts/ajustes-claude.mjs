@@ -2,7 +2,7 @@
 // Los usan el instalador, el doctor y la prueba del servidor; la app de escritorio lee el mismo fichero.
 //
 //   node ajustes-claude.mjs estado                                líneas clave=valor (la clave sale tapada)
-//   node ajustes-claude.mjs registrar --licencia drz_... [--fuente-local <carpeta del repo>]
+//   node ajustes-claude.mjs registrar --licencia <drz_... o drzc_...> [--fuente-local <carpeta del repo>]
 //   node ajustes-claude.mjs telemetria                            env.HYPERFRAMES_NO_TELEMETRY = "1"
 //   node ajustes-claude.mjs carpeta --ruta <carpeta de Drazo>     crea videos/ y el bloque de Drazo en CLAUDE.md
 //   node ajustes-claude.mjs instalar-plugin --claude <ruta de la orden claude> [--fuente-local <carpeta del repo>]
@@ -11,6 +11,7 @@
 // Antes de escribir siempre deja copia (settings.json.antes-de-drazo-<fecha>). Si el fichero no es JSON
 // válido, no lo toca. Códigos: 0 bien · 1 no se pudo · 2 uso incorrecto.
 import { spawnSync } from "node:child_process"
+import { randomUUID } from "node:crypto"
 import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -24,11 +25,16 @@ const ESPERA_MCP_MS = 900_000
 const PREFIJO_MCP = "mcp__plugin_drazo_drazo__"
 export const HERRAMIENTAS_DRAZO = [
   "drazo_estado", "drazo_onboarding", "drazo_marca", "drazo_empezar", "drazo_guia", "drazo_motor",
-  "drazo_direccion", "drazo_revisar", "drazo_variantes", "drazo_encargo", "drazo_entregar",
+  "drazo_direccion", "drazo_revisar", "drazo_variantes", "drazo_encargo", "drazo_entregar", "drazo_marcas",
 ]
 // Las únicas que llaman los ayudantes (subagentes) del plugin: son las que se permiten de antemano
 export const HERRAMIENTAS_AYUDANTE = ["drazo_direccion", "drazo_revisar", "drazo_variantes", "drazo_encargo", "drazo_entregar"]
-export const PERMISOS_DRAZO = HERRAMIENTAS_AYUDANTE.map((h) => PREFIJO_MCP + h)
+// drazo_marcas (solo con clave de cuenta) es de solo lectura y la llama la skill al saludar y al cambiar de marca
+export const PERMISOS_DRAZO = [...HERRAMIENTAS_AYUDANTE, "drazo_marcas"].map((h) => PREFIJO_MCP + h)
+
+// Clave de siempre (drz_) o de cuenta con varias marcas (drzc_ + 43 caracteres base64url)
+export const CLAVE_VALIDA = /^(drz_\S{8,}|drzc_[A-Za-z0-9_-]{43})$/
+const ES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export const carpetaConfig = () => process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude")
 export const rutaAjustes = () => join(carpetaConfig(), "settings.json")
@@ -52,7 +58,7 @@ export function leerAjustes() {
 
 export const licenciaGuardada = (a) => (a?.pluginConfigs?.[ID_PLUGIN]?.options?.licencia || "").trim()
 
-const tapar = (clave) => (clave ? `drz_…${clave.slice(-4)}` : "")
+const tapar = (clave) => (clave ? `${clave.startsWith("drzc_") ? "drzc_" : "drz_"}…${clave.slice(-4)}` : "")
 
 function seccion(a, nombre) {
   if (!esObjeto(a[nombre])) a[nombre] = {}
@@ -73,12 +79,12 @@ export function registrar(a, { licencia, fuenteLocal }) {
   const fuente = fuenteLocal ? { source: "directory", path: resolve(fuenteLocal) } : { source: "github", repo: REPO }
   seccion(a, "extraKnownMarketplaces")[MARKETPLACE] = { source: fuente, autoUpdate: true }
   seccion(a, "enabledPlugins")[ID_PLUGIN] = true
-  if (licencia) {
-    const configs = seccion(a, "pluginConfigs")
-    const actual = esObjeto(configs[ID_PLUGIN]) ? configs[ID_PLUGIN] : {}
-    const opciones = esObjeto(actual.options) ? actual.options : {}
-    configs[ID_PLUGIN] = { ...actual, options: { ...opciones, licencia } }
-  }
+  const configs = seccion(a, "pluginConfigs")
+  const actual = esObjeto(configs[ID_PLUGIN]) ? configs[ID_PLUGIN] : {}
+  const opciones = esObjeto(actual.options) ? actual.options : {}
+  // Identificador fijo de este equipo (lo pide el servidor a las cuentas de agencia): se conserva si ya hay uno válido
+  const instalacion = typeof opciones.instalacion === "string" && ES_UUID.test(opciones.instalacion) ? opciones.instalacion : randomUUID()
+  configs[ID_PLUGIN] = { ...actual, options: { ...opciones, ...(licencia ? { licencia } : {}), instalacion } }
   permitirHerramientas(a)
   const env = seccion(a, "env")
   env.CLAUDE_CODE_PLUGIN_PREFER_HTTPS = "1"
@@ -146,10 +152,14 @@ function resultadoJson(salida) {
 }
 
 export function instalarPlugin({ claude, fuenteLocal }) {
-  const licencia = licenciaGuardada(leerAjustes())
+  const ajustes = leerAjustes()
+  const licencia = licenciaGuardada(ajustes)
+  const previa = ajustes?.pluginConfigs?.[ID_PLUGIN]?.options?.instalacion
+  const instalacion = typeof previa === "string" && ES_UUID.test(previa) ? previa : ""
   const mercado = ejecutarClaude(claude, ["plugin", "marketplace", "add", fuenteLocal ? resolve(fuenteLocal) : REPO])
   const instalar = () => resultadoJson(ejecutarClaude(claude, ["plugin", "install", ID_PLUGIN, "--scope", "user", "--json", "-y",
-    ...(licencia ? ["--config", `licencia=${licencia}`] : [])]))
+    ...(licencia ? ["--config", `licencia=${licencia}`] : []),
+    ...(instalacion ? ["--config", `instalacion=${instalacion}`] : [])]))
   // El catálogo al día antes de instalar: si no, «install» no ve la versión nueva
   ejecutarClaude(claude, ["plugin", "marketplace", "update", MARKETPLACE])
   let r = instalar()
@@ -208,7 +218,7 @@ export function estado() {
     activado: a.enabledPlugins?.[ID_PLUGIN] === true ? "si" : "no",
     licencia: clave ? "si" : "no",
     licencia_tapada: tapar(clave),
-    licencia_formato: clave.startsWith("drz_") ? "si" : "no",
+    licencia_formato: /^drzc?_/.test(clave) ? "si" : "no",
     telemetria: a.env?.HYPERFRAMES_NO_TELEMETRY === "1" ? "si" : "no",
     https: a.env?.CLAUDE_CODE_PLUGIN_PREFER_HTTPS === "1" ? "si" : "no",
     espera_mcp: Number(a.env?.MCP_TOOL_TIMEOUT) >= ESPERA_MCP_MS ? "si" : "no",
@@ -253,7 +263,7 @@ function principal(argv) {
     }
   }
   if (orden !== "registrar" && orden !== "telemetria") {
-    console.error("Uso: node ajustes-claude.mjs estado | registrar --licencia drz_... [--fuente-local <carpeta>] | telemetria | carpeta --ruta <carpeta>")
+    console.error("Uso: node ajustes-claude.mjs estado | registrar --licencia <drz_... o drzc_...> [--fuente-local <carpeta>] | telemetria | carpeta --ruta <carpeta>")
     return 2
   }
   try {
@@ -262,8 +272,8 @@ function principal(argv) {
       seccion(a, "env").HYPERFRAMES_NO_TELEMETRY = "1"
     } else {
       const licencia = (valor("--licencia") || "").trim() || licenciaGuardada(a)
-      if (!/^drz_\S{8,}$/.test(licencia)) {
-        console.error("Falta una clave de licencia válida de Drazo (empieza por drz_).")
+      if (!CLAVE_VALIDA.test(licencia)) {
+        console.error("Falta una clave válida de Drazo (empieza por drz_, o por drzc_ si es una cuenta con varias marcas).")
         return 2
       }
       registrar(a, { licencia, fuenteLocal: valor("--fuente-local") })

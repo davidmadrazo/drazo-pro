@@ -457,7 +457,7 @@ comprobar_licencia() {
     if ! estado_ajustes; then resultado licencia "$nombre" falta "sin Node.js no se pueden leer los ajustes de Claude" "Instala Node.js con el instalador de Drazo."; return; fi
     if [ "${AJ_ajustes:-}" = "json-invalido" ]; then resultado licencia "$nombre" falta "los ajustes de Claude no se pueden leer" "Revisa el fichero: ${AJ_detalle:-}"; return; fi
     if [ "${AJ_licencia:-}" != "si" ]; then resultado licencia "$nombre" falta "no está guardada" "Guárdala con el paso «registrar» del instalador de Drazo y tu clave drz_."; return; fi
-    if [ "${AJ_licencia_formato:-}" != "si" ]; then resultado licencia "$nombre" aviso "no empieza por drz_" "Revisa que guardaste la clave completa de Drazo."; return; fi
+    if [ "${AJ_licencia_formato:-}" != "si" ]; then resultado licencia "$nombre" aviso "no empieza por drz_ ni drzc_" "Revisa que guardaste la clave completa de Drazo."; return; fi
     resultado licencia "$nombre" ok "${AJ_licencia_tapada:-}"
 }
 

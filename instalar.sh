@@ -5,7 +5,7 @@
 # Uso:
 #   bash instalar.sh --solo-comprobar                         solo mira, no cambia nada
 #   bash instalar.sh --doctor                                 pasa el doctor completo (también prueba el servidor)
-#   bash instalar.sh --si [--pasos git,node,...] [--licencia drz_...] [--carpeta <ruta>]   sin preguntas
+#   bash instalar.sh --si [--pasos git,node,...] [--licencia <clave>] [--carpeta <ruta>]   sin preguntas
 #                                                             (--carpeta: crea ahí videos/ y el CLAUDE.md de Drazo)
 #   bash instalar.sh                                          pregunta antes de cada paso
 #   bash instalar.sh --marketplace <carpeta del repo>         registra Drazo desde una carpeta (pruebas)
@@ -299,13 +299,13 @@ instalar_claude() {
 pedir_licencia() {
     local intento clave
     for intento in 1 2 3; do
-        printf 'Pega tu clave de licencia de Drazo (empieza por drz_) y pulsa Intro: ' > /dev/tty
+        printf 'Pega tu clave de licencia de Drazo (empieza por drz_ o drzc_) y pulsa Intro: ' > /dev/tty
         IFS= read -r -s clave < /dev/tty || clave=""
         echo "" > /dev/tty
         clave="$(printf '%s' "$clave" | tr -d '[:space:]')"
         [ -z "$clave" ] && return 0
-        case "$clave" in drz_????????*) printf '%s' "$clave"; return 0 ;; esac
-        echo "Eso no parece una clave de Drazo: empieza por drz_. Prueba otra vez." > /dev/tty
+        case "$clave" in drz_????????*|drzc_???????????????????????????????????????????) printf '%s' "$clave"; return 0 ;; esac
+        echo "Eso no parece una clave de Drazo: empieza por drz_ o drzc_. Prueba otra vez." > /dev/tty
     done
 }
 
@@ -426,7 +426,7 @@ principal() {
         if [ "$id" = "registrar" ] && [ "$SI" = "1" ] && [ -z "$LICENCIA" ]; then
             estado_ajustes
             if [ "${AJ_licencia:-}" != "si" ]; then
-                echo "-> [$id] falta: no hay clave de licencia; pásala con --licencia drz_..."; fallan="$fallan,$id"; uso_malo=1; continue
+                echo "-> [$id] falta: no hay clave de licencia; pásala con --licencia <clave>"; fallan="$fallan,$id"; uso_malo=1; continue
             fi
         fi
         "instalar_$id"; codigo=$?
