@@ -15,7 +15,15 @@ test("la versión de plugin.json es la de la cabecera X-Drazo-Plugin de .mcp.jso
   assert.equal(json(".mcp.json").mcpServers.drazo.headers["X-Drazo-Plugin"], version)
 })
 
-test("la versión es la 0.6.0 o posterior (los agentes del modo cliente)", () => {
+test("la versión es la 0.7.0 o posterior (las cuentas con varias marcas)", () => {
   const [a, b] = json(".claude-plugin/plugin.json").version.split(".").map(Number)
-  assert.ok(a > 0 || b >= 6)
+  assert.ok(a > 0 || b >= 7)
+})
+
+test("el plugin pide la instalación en userConfig (opcional) y la manda en su cabecera", () => {
+  const campo = json(".claude-plugin/plugin.json").userConfig.instalacion
+  assert.equal(campo.type, "string")
+  assert.notEqual(campo.required, true)
+  assert.equal(json(".mcp.json").mcpServers.drazo.headers["X-Drazo-Instalacion"], "${user_config.instalacion}")
+  assert.match(json(".claude-plugin/plugin.json").userConfig.licencia.description, /drzc_/)
 })

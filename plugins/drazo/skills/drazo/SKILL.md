@@ -1,8 +1,8 @@
 ---
 name: drazo
-description: Editor de vídeo Drazo Pro. Úsala siempre que el usuario quiera editar o montar un vídeo, un bruto, un reel o una historia de Instagram («edítame el vídeo», «edita este bruto», «monta este vídeo», «edítame esta historia», «edítamelo viral»), cuando salude o empiece con Drazo («hola drazo», «empezar con drazo»), cuando quiera variantes, reels de prueba o un cambio de un vídeo ya hecho, cuando pregunte cuántos vídeos le quedan, cuando quiera configurar o cambiar su marca o rehacer su onboarding, o cuando Drazo dé un error. Va antes que las skills de HyperFrames o Tesseract, que solo se usan cuando lo indique el servidor de Drazo. El método lo da el servidor con sus herramientas; esta skill solo dice cómo usarlas.
-when_to_use: Frases como «hola drazo», «empezar con drazo», «configura mi marca», «edítame este vídeo», «móntame el reel», «edítame esta historia», «para mis historias», «stories», «corta este bruto», «edítamelo viral», «sin preguntas», «modo prueba», «hazme variantes», «reels de prueba», «prueba otro gancho», «cámbiale el título», «quita esta parte», «hazlo más corto», «¿cuántos vídeos me quedan?», «rehaz mi onboarding», «cambia mis colores», «cambia mi letra», «Drazo no funciona» o «¿está bien instalado Drazo?».
-allowed-tools: mcp__plugin_drazo_drazo__drazo_estado mcp__plugin_drazo_drazo__drazo_onboarding mcp__plugin_drazo_drazo__drazo_marca mcp__plugin_drazo_drazo__drazo_empezar mcp__plugin_drazo_drazo__drazo_guia mcp__plugin_drazo_drazo__drazo_motor mcp__plugin_drazo_drazo__drazo_direccion mcp__plugin_drazo_drazo__drazo_revisar mcp__plugin_drazo_drazo__drazo_variantes
+description: Editor de vídeo Drazo Pro. Úsala siempre que el usuario quiera editar o montar un vídeo, un bruto, un reel o una historia de Instagram («edítame el vídeo», «edita este bruto», «monta este vídeo», «edítame esta historia», «edítamelo viral»), cuando salude o empiece con Drazo («hola drazo», «empezar con drazo»), cuando quiera variantes, reels de prueba o un cambio de un vídeo ya hecho, cuando pregunte cuántos vídeos le quedan, cuando trabaje con varias marcas o clientes («ahora con el cliente…»), cuando quiera configurar o cambiar su marca o rehacer su onboarding, o cuando Drazo dé un error. Va antes que las skills de HyperFrames o Tesseract, que solo se usan cuando lo indique el servidor de Drazo. El método lo da el servidor con sus herramientas; esta skill solo dice cómo usarlas.
+when_to_use: Frases como «Hola Drazo», «Edítame el reel», «Edítame esta historia», «Hazlo más corto», «Sin música», «Cámbiale el título por…», «Quítale los dos primeros segundos», «Hazme tres variantes para reels de prueba», «¿Cuántos vídeos me quedan?», «Ahora con el cliente X», «hola drazo», «empezar con drazo», «configura mi marca», «edítame este vídeo», «móntame el reel», «edítame esta historia», «para mis historias», «stories», «corta este bruto», «edítamelo viral», «sin preguntas», «modo prueba», «hazme variantes», «reels de prueba», «prueba otro gancho», «cámbiale el título», «quita esta parte», «hazlo más corto», «¿cuántos vídeos me quedan?», «rehaz mi onboarding», «cambia mis colores», «cambia mi letra», «Drazo no funciona» o «¿está bien instalado Drazo?».
+allowed-tools: mcp__plugin_drazo_drazo__drazo_estado mcp__plugin_drazo_drazo__drazo_onboarding mcp__plugin_drazo_drazo__drazo_marca mcp__plugin_drazo_drazo__drazo_empezar mcp__plugin_drazo_drazo__drazo_guia mcp__plugin_drazo_drazo__drazo_motor mcp__plugin_drazo_drazo__drazo_direccion mcp__plugin_drazo_drazo__drazo_revisar mcp__plugin_drazo_drazo__drazo_variantes mcp__plugin_drazo_drazo__drazo_marcas
 ---
 
 # Drazo Pro
@@ -22,17 +22,43 @@ El método de edición vive en el servidor de Drazo y llega por sus herramientas
 | `drazo_direccion` | La dirección del vídeo a partir de la transcripción y las notas |
 | `drazo_revisar` | Revisar el corte y saber qué arreglar |
 | `drazo_variantes` | Variantes de un vídeo ya hecho para reels de prueba, todas en una llamada |
+| `drazo_marcas` | Solo con una cuenta de varias marcas: lista sus marcas y lo que le queda a cada una (ver «Cuenta con varias marcas») |
 | `drazo_encargo`, `drazo_entregar` | Solo las usan los ayudantes de Drazo (ver «Cuando `drazo_estado` dice `direccion: "cliente"`»); tú no las llamas |
 
 ## Cuando el usuario saluda o quiere configurar su marca
 
-Con «hola drazo», «empezar con drazo» o «configura mi marca»: llama a `drazo_estado` y, si devuelve `onboarding_pendiente`, sigue `drazo_onboarding` con el usuario, con las preguntas de una en una y esperando cada respuesta. Si no está pendiente, salúdale, dile cuántos vídeos lleva este mes de su plan (`videos_este_mes` de `videos_mes_maximo`; si `videos_mes_maximo` es un texto, como «sin límite (uso razonable…)», enséñaselo tal cual, sin convertirlo en un número) y, en pocas líneas, lo que puede pedirte:
+Con «hola drazo», «empezar con drazo» o «configura mi marca» (si tienes la herramienta `drazo_marcas`, sigue «Cuenta con varias marcas» en vez de esto): llama a `drazo_estado` y, si devuelve `onboarding_pendiente`, sigue `drazo_onboarding` con el usuario, con las preguntas de una en una y esperando cada respuesta. Si no está pendiente, salúdale, dile cuántos vídeos lleva este mes de su plan (`videos_este_mes` de `videos_mes_maximo`; si `videos_mes_maximo` es un texto, como «sin límite (uso razonable…)», enséñaselo tal cual, sin convertirlo en un número) y, en pocas líneas, lo que puede pedirte:
 
 - «Edítame el vídeo», con los brutos en esta carpeta y el guion pegado: un vídeo nuevo.
 - «Edítame esta historia»: una historia de Instagram, gratis y sin contar en su plan.
 - «Cámbiale…» (un texto, un color, quitar o acortar una parte, la música): un cambio del último vídeo.
 - «Hazme 3 variantes para reels de prueba»: otros arranques del mismo vídeo para probar cuál funciona.
 - «¿Cuántos vídeos me quedan?»: lo que lleva del mes y lo que incluye cada vídeo.
+
+## Cuenta con varias marcas
+
+Solo si tienes la herramienta `drazo_marcas`: el servidor la lista únicamente con una clave de cuenta (la de una agencia con varias marcas). Si no la tienes, ignora esta sección: todo sigue exactamente como se ha descrito, con una sola marca. En una cuenta, «carpeta de Drazo» es la carpeta de esta conversación.
+
+**Al saludar** («Hola Drazo»):
+
+1. Llama a `drazo_marcas`. Trae cada marca con `marca_slug`, `nombre` y `estado`; si está activa, también lo que le queda de su periodo.
+2. Si esta conversación aún no tiene marca: pregunta con cuál se trabaja, enseñando los nombres, de una línea. Si solo hay una activa, usa esa sin preguntar.
+3. Dile en una línea con qué marca estáis («Trabajamos con <nombre>»).
+4. Llama a `drazo_estado` con su `marca_slug`. Si trae `onboarding_pendiente`, es la primera vez de esa marca: avísale de que la primera vez Drazo aprende el estilo de esa marca y sigue `drazo_onboarding` con `marca_slug`, con las preguntas de una en una. Cada marca tiene su propio onboarding y su propio estilo.
+
+Si no hay ninguna marca activa, enséñale las que hay con su estado, díselo tal cual y para.
+
+**Marca de la conversación.** Desde que se elige, todas las llamadas que no van dentro de un proyecto (`drazo_estado`, `drazo_onboarding`, `drazo_marca`, `drazo_empezar`) llevan ese `marca_slug`. Con un proyecto abierto, la marca es la de su proyecto: no se la cambies.
+
+**Carpetas.** Cada marca trabaja en `<carpeta de Drazo>/<marca_slug>/`, con su `videos/`, su `proyectos/` y su `marca/`. Créalas la primera vez que se trabaje con esa marca. Sus brutos, sus proyectos, sus vídeos editados y su logo van ahí, y nunca se mezclan con los de otra marca: no uses brutos ni logos de una marca en el vídeo de otra. El logo se queda en esa carpeta; no se sube nada. Donde arriba dice `videos/` y `proyectos/<video>/`, en una cuenta es `<marca_slug>/videos/` y `<marca_slug>/proyectos/<video>/`. Los ayudantes de Drazo no cambian: trabajan dentro de la carpeta del vídeo, que ya está en la de su marca.
+
+**«Ahora con el cliente X».** Busca X entre los `nombre` y los `marca_slug` de `drazo_marcas` (sin distinguir mayúsculas ni tildes). Si encaja una sola, cambia a esa marca y a su carpeta, confírmaselo en una línea y llama a `drazo_estado` con su `marca_slug` (si es su primera vez, haz su arranque de estilo como al saludar). Si encajan varias, pregunta cuál en una línea. Si no encaja ninguna, enséñale sus marcas. A partir de ahí, todo lleva el `marca_slug` nuevo.
+
+**«¿Cuántos vídeos me quedan?»**. Con la marca actual, llama a `drazo_estado` y dile `te_quedan` de `videos_del_periodo`, `se_renuevan_el`, y los vídeos extra del periodo (`extras_este_periodo`, `videos_extra`) si los hay. Si pregunta por todas las marcas, llama a `drazo_marcas` y dale una línea por marca. Si `videos_del_periodo` o `uso_razonable` vienen como texto, enséñalo tal cual.
+
+**Antes de empezar un reel**, si `te_quedan` de la marca es 0: avísale en una línea de que será un vídeo extra (3 €, se cobra con la próxima cuota de esa marca) y sigue con el vídeo si no dice lo contrario. Las historias nunca son extra: no cuentan en el periodo de la marca. Los cambios y las variantes de un vídeo ya hecho tampoco.
+
+**Avisos del servidor.** Si un aviso pide un `marca_slug` (porque falta o no es de la cuenta), o dice que la cuenta está en otro ordenador, cuéntaselo al usuario tal cual, en una línea, con las palabras del aviso, y para: no pruebes otra marca ni otra vía por tu cuenta. Si lo que falta es el `marca_slug`, pregúntale con qué marca trabajáis y repite la llamada con ella.
 
 ## Cuando el usuario pide editar un vídeo
 
@@ -45,7 +71,7 @@ Con «hola drazo», «empezar con drazo» o «configura mi marca»: llama a `dra
 
 **Historias**: Drazo las edita en este ordenador sin su IA (sin dirección, revisión ni variantes del servidor), así que son gratis y no cuentan en su plan de vídeos. Su plan las monta con los motores de Drazo y los subtítulos de su marca; si el usuario quiere la dirección de Drazo, es un reel.
 
-**Carpetas**: el usuario encuentra sus vídeos editados en la carpeta `videos/` de la carpeta de Drazo (cada versión que le enseñes y el vídeo final); el trabajo de cada vídeo va en `proyectos/<video>/`. Si falta alguna, créala.
+**Carpetas** (en una cuenta de varias marcas, dentro de la carpeta de la marca; ver «Cuenta con varias marcas»): el usuario encuentra sus vídeos editados en la carpeta `videos/` de la carpeta de Drazo (cada versión que le enseñes y el vídeo final); el trabajo de cada vídeo va en `proyectos/<video>/`. Si falta alguna, créala.
 
 ## Cuando `drazo_estado` dice `direccion: "cliente"`
 
@@ -74,7 +100,7 @@ Es el mismo vídeo: se trabaja en su proyecto (`proyectos/<video>/`, con su `pro
 
 Ni los cambios ni las variantes cuentan como vídeos nuevos. Cada vídeo incluye dos cambios grandes, cuatro revisiones de Drazo y dos tandas de variantes; los cambios pequeños no tienen límite (los números de su plan, en `drazo_estado`). Si el número de vídeos del mes viene como un texto (modo cliente), enséñalo tal cual. Si Drazo dice que algo se ha agotado, cuéntaselo con esas palabras y ofrécele lo que sí puede: un cambio pequeño, o empezar el vídeo de nuevo (cuenta como otro vídeo de su plan). Si el proyecto ya está cerrado (Drazo lo dice), empieza uno nuevo con `drazo_empezar`.
 
-Si pregunta cuántos vídeos le quedan o qué incluye su plan, llama a `drazo_estado` y díselo en dos líneas.
+Si pregunta cuántos vídeos le quedan o qué incluye su plan, llama a `drazo_estado` (con `marca_slug` si es una cuenta) y díselo en dos líneas.
 
 **Modo prueba**: si el usuario dice «edítamelo viral», «sin preguntas» o «modo prueba», no hay onboarding: `drazo_onboarding` trae la `ficha_modo_prueba`; guárdala con el nicho que encaje y edita. Cuando `drazo_estado` devuelva `modo_prueba: true`, al entregar el vídeo ofrécele hacer el onboarding.
 

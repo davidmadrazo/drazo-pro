@@ -6,7 +6,7 @@ Drazo Pro edita tus vídeos dentro de Claude, en tu propio ordenador. Le dices �
 
 - Un ordenador con **Windows 10 u 11** (64 bits) o un **Mac con macOS 13** o superior.
 - Una suscripción de pago a Claude: **Max 5x recomendado**. Con Pro también funciona, pero editar un vídeo gasta mucho y puede pausarse hasta que se renueve tu cupo.
-- Tu **clave de licencia de Drazo**. Empieza por `drz_` y te la enviamos al darte de alta.
+- Tu **clave de licencia de Drazo**. Empieza por `drz_` (o por `drzc_` si es una cuenta de agencia con varias marcas) y te la enviamos al darte de alta.
 - Unos **10 GB libres** en el disco y, mejor, 16 GB de memoria (mínimo 8).
 
 ## Instalar sin tocar la terminal
@@ -72,7 +72,7 @@ La transcripción, el montaje y el render se hacen en tu equipo. Los reels que n
 - HyperFrames, el motor con el que se montan los vídeos (su navegador y sus guías).
 - Las fuentes libres de las plantillas: Anton, Caveat, Poppins, Inter y JetBrains Mono (de Google Fonts, licencia OFL).
 - Opcional: Tesseract, de Mirage. Si lo instalas, aceptas sus condiciones de uso.
-- El plugin de Drazo para Claude (versión 0.6.1), conectado con tu clave. Incluye dos ayudantes internos, `drazo-director` y `drazo-revisor`, que Claude lanza solo cuando hace falta; el instalador también deja permitidas en tu configuración de Claude las herramientas de Drazo.
+- El plugin de Drazo para Claude (versión 0.7.0), conectado con tu clave. Incluye dos ayudantes internos, `drazo-director` y `drazo-revisor`, que Claude lanza solo cuando hace falta; el instalador también deja permitidas en tu configuración de Claude las herramientas de Drazo.
 
 Lo de Drazo se guarda en su propia carpeta: `%LOCALAPPDATA%\Drazo` en Windows y `~/.local/share/drazo` en Mac.
 

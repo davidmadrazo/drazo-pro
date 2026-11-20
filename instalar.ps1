@@ -4,7 +4,7 @@
 # Uso:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File instalar.ps1 -SoloComprobar     solo mira, no cambia nada
 #   ... -Doctor                                         pasa el doctor completo (también prueba el servidor)
-#   ... -Si [-Pasos git,node,...] [-Licencia drz_...] [-Carpeta <ruta>]   sin preguntas (pegar INSTALAR.md ya es su sí)
+#   ... -Si [-Pasos git,node,...] [-Licencia <clave>] [-Carpeta <ruta>]   sin preguntas (pegar INSTALAR.md ya es su sí)
 #       -Carpeta: crea ahí videos\ y el CLAUDE.md de Drazo
 #   ... (sin opciones)                                  pregunta en la terminal antes de cada paso
 #   ... -Marketplace <carpeta del repo>                 registra Drazo desde una carpeta local (pruebas)
@@ -200,12 +200,12 @@ function Instalar-Tesseract {
 
 function Pedir-Licencia {
     for ($intento = 1; $intento -le 3; $intento++) {
-        $segura = Read-Host 'Pega tu clave de licencia de Drazo (empieza por drz_) y pulsa Intro' -AsSecureString
+        $segura = Read-Host 'Pega tu clave de licencia de Drazo (empieza por drz_ o drzc_) y pulsa Intro' -AsSecureString
         $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($segura)
         try { $clave = "$([Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr))".Trim() } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
         if (-not $clave) { return '' }
-        if ($clave -match '^drz_\S{8,}$') { return $clave }
-        Avisar 'Eso no parece una clave de Drazo: empieza por drz_. Prueba otra vez.'
+        if ($clave -match '^(drz_\S{8,}|drzc_[A-Za-z0-9_-]{43})$') { return $clave }
+        Avisar 'Eso no parece una clave de Drazo: empieza por drz_ o drzc_. Prueba otra vez.'
     }
     ''
 }
@@ -321,7 +321,7 @@ function Ejecutar-Pasos($Catalogo, $Lista) {
         } elseif (-not (Preguntar "¿$($paso.Texto)?")) { Write-Host "-> [$id] omitido"; $omitidos += $id; continue }
         $ajustes = Estado-Ajustes
         if ($id -eq 'registrar' -and $Si -and -not $Licencia -and (-not $ajustes -or $ajustes['licencia'] -ne 'si')) {
-            Write-Host "-> [$id] falta: no hay clave de licencia; pásala con -Licencia drz_..."
+            Write-Host "-> [$id] falta: no hay clave de licencia; pásala con -Licencia <clave>"
             $fallan += $id; $usoMalo = $true; continue
         }
         try {

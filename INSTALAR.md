@@ -1,6 +1,6 @@
 # Instalar Drazo Pro — instrucciones para Claude
 
-Este documento es para ti, Claude. Un cliente de Drazo Pro te ha pegado este enlace y su clave de licencia (empieza por `drz_`). Lo instalas tú con tus herramientas; la persona solo aprueba los permisos en el chat.
+Este documento es para ti, Claude. Un cliente de Drazo Pro te ha pegado este enlace y su clave de licencia (empieza por `drz_`, o por `drzc_` si es una cuenta de agencia con varias marcas). Lo instalas tú con tus herramientas; la persona solo aprueba los permisos en el chat.
 
 Si lo has leído con una herramienta que resume, descárgalo entero con la terminal (`Invoke-WebRequest` en Windows, `curl` en Mac) y léelo completo antes de empezar: las órdenes tienen que ir exactas.
 
@@ -14,6 +14,8 @@ Si lo has leído con una herramienta que resume, descárgalo entero con la termi
 - Las órdenes en primer plano se cortan a los 10 minutos: lanza los bloques B y C en segundo plano (`run_in_background`) y mira su salida cada minuto o dos hasta que aparezca la línea `RESUMEN:`.
 - El instalador escribe una línea por paso: `-> [paso] ok|ya estaba|falta|error|pendiente: ...`, y al final `RESUMEN: ...`. Código de salida: 0 bien · 1 algún paso no quedó bien · 2 uso incorrecto · 3 equipo no compatible · 4 esperando al usuario.
 - Si un paso falla dos veces, para, cuéntale al usuario qué pasa en una frase y ofrécele escribir al soporte de ProfimaxIA (davidmadrazo@profimaxia.com).
+
+Una cuenta de agencia se instala igual: el mensaje es «Instala Drazo siguiendo <esta guía>. Mi clave de cuenta es drzc_…» y la clave `drzc_` va al paso `registrar`, a `licencia`, igual que una `drz_`. Con una cuenta, cada marca tendrá su carpeta dentro de la de Drazo (`<marca>/videos`, `<marca>/proyectos`, `<marca>/marca`), que Drazo crea la primera vez que se trabaja con esa marca. Nada de eso hay que prepararlo en la instalación.
 
 ## 1. Mira qué sistema es
 
@@ -76,12 +78,12 @@ Di algo como: «Ahora conecto Drazo con tu Claude, guardo tu clave y preparo est
 
 `$PWD` es la carpeta de esta conversación: la que el usuario eligió para Drazo.
 
-El paso `registrar` deja además permitidas en los ajustes del usuario las herramientas de Drazo (`permissions.allow`, sin tocar sus otras reglas, con copia de seguridad). El plugin (0.6.1) trae dos ayudantes internos, `drazo-director` y `drazo-revisor`, que Claude lanza solo cuando hace falta: no hay nada que configurar.
+El paso `registrar` deja además permitidas en los ajustes del usuario las herramientas de Drazo (`permissions.allow`, sin tocar sus otras reglas, con copia de seguridad). El plugin (0.7.0) trae dos ayudantes internos, `drazo-director` y `drazo-revisor`, que Claude lanza solo cuando hace falta: no hay nada que configurar.
 
 Comprobación: `-> [registrar] ok: registrado y descargado`, y en esta carpeta, `videos` y `CLAUDE.md`. Si los ajustes no son JSON válido, el instalador no los toca: díselo al usuario y ofrécele el soporte.
 
 Lo que hace este paso, por si alguna vez hay que comprobarlo a mano:
-1. Fusiona en `~/.claude/settings.json` (Windows: `%USERPROFILE%\.claude\settings.json`; o en `CLAUDE_CONFIG_DIR` si existe), con copia de seguridad antes (`settings.json.antes-de-drazo-<fecha>`) y sin tocar lo demás: el marketplace `drazo` (`davidmadrazo/drazo-pro`, con actualización automática), el plugin `drazo@drazo` activado, la licencia en `pluginConfigs` y, en `env`, `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` y `MCP_TOOL_TIMEOUT=900000`.
+1. Fusiona en `~/.claude/settings.json` (Windows: `%USERPROFILE%\.claude\settings.json`; o en `CLAUDE_CONFIG_DIR` si existe), con copia de seguridad antes (`settings.json.antes-de-drazo-<fecha>`) y sin tocar lo demás: el marketplace `drazo` (`davidmadrazo/drazo-pro`, con actualización automática), el plugin `drazo@drazo` activado, la licencia y el identificador de esta instalación (un UUID que se genera una sola vez por equipo y se conserva al reinstalar o actualizar; las cuentas de agencia lo necesitan) en `pluginConfigs`, y en `env`, `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` y `MCP_TOOL_TIMEOUT=900000`.
 2. Descarga e instala el plugin con la orden `claude` (`claude plugin marketplace add davidmadrazo/drazo-pro` y `claude plugin install drazo@drazo --scope user`); si ya estaba en una versión anterior, lo actualiza (`claude plugin update drazo@drazo`). Si no está esa orden, la instala con el instalador oficial de Anthropic, sin contraseña de administrador. La app no siempre lo descarga sola al reabrirse: por eso se hace aquí.
 3. Crea `videos` en esta carpeta y escribe en su `CLAUDE.md` el bloque de Drazo (si ya había un `CLAUDE.md`, lo añade al final sin tocar lo demás).
 
@@ -97,7 +99,7 @@ Díselo así: «¡Listo! Cierra la app de Claude del todo (en Mac, Cmd+Q; en Win
 
 ## Para actualizar Drazo
 
-Si el usuario pide actualizar Drazo, o Drazo dice que está desactualizado, sin preguntar: vuelve a descargar el instalador (paso 2, que trae el de siempre al día) y repite solo el paso 5 sin la clave (Windows: `INSTALAR -Si -Pasos registrar -Carpeta "$PWD"`; macOS: `INSTALAR --si --pasos registrar --carpeta "$PWD"`). Después pídele que cierre la app de Claude del todo (en Mac, Cmd+Q) y la vuelva a abrir.
+Si el usuario pide actualizar Drazo, o Drazo dice que está desactualizado, sin preguntar: vuelve a descargar el instalador (paso 2, que trae el de siempre al día) y repite solo el paso 5 sin la clave (esto deja puesta la versión nueva del plugin y su identificador de instalación, que `registrar` genera si falta y conserva si ya existe; Windows: `INSTALAR -Si -Pasos registrar -Carpeta "$PWD"`; macOS: `INSTALAR --si --pasos registrar --carpeta "$PWD"`). Después pídele que cierre la app de Claude del todo (en Mac, Cmd+Q) y la vuelva a abrir.
 
 ## Si Drazo avisa de que Node.js no tiene los parches
 
