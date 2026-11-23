@@ -32,6 +32,13 @@ SHA256_FFMPEG_ARM64="c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b09449
 SHA256_FFPROBE_ARM64="fcbe839537485eaee7a7a8bc5cbc0f90d53617e80943e8a5b2e31cb851197ea6"
 SHA256_FFMPEG_X86_64="7c6b4125b191cbf773832dc51f424cf2b6bb7da43007d1e066f95909e47cacd4"
 SHA256_FFPROBE_X86_64="2322438ed2f6319a691291b247d09c69dcaa3a982460d1f269a7e1af335cfdfd"
+# Reserva para Intel si no se llega a martin-riedl.de (va por Cloudflare): ffmpeg 9.0.2 estático de
+# https://evermeet.cx/ffmpeg (solo x86_64, macOS 10.13 o superior; trae libx264 y zimg), sin Cloudflare. Las
+# huellas se fijaron con su firma GPG comprobada (clave 20F6 EA3E 0CFD 6B4C 5344 7A73 476C 4B61 1A66 0874).
+URL_FFMPEG_X86_64_RESERVA="https://evermeet.cx/ffmpeg/ffmpeg-9.0.2.zip"
+URL_FFPROBE_X86_64_RESERVA="https://evermeet.cx/ffmpeg/ffprobe-9.0.2.zip"
+SHA256_FFMPEG_X86_64_RESERVA="4acc0be580f9b2788029eb7bd4d645ff87968911b0a62aeeb3940d42d54558d5"
+SHA256_FFPROBE_X86_64_RESERVA="24a9c968cd4da72d99c7245e914b921815835eb6dff01d99868031aebaf1d439"
 LISTA_FUENTES="$DRAZO_SCRIPTS/fuentes.txt"
 CARPETA_FUENTES="$HOME/Library/Fonts"
 VERSION_TESSERACT="0.2.0"
