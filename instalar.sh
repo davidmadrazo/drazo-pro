@@ -103,10 +103,12 @@ ENTORNO
     cargar_rutas_drazo
 }
 
-# Descarga a un fichero y comprueba su SHA-256; si no coincide, lo borra y falla.
+# Descarga a un fichero y comprueba su SHA-256; si no coincide, lo borra y falla. Un servidor al que no se llega
+# (por ejemplo, una IP de Cloudflare cortada por la operadora) falla en 30 s por intento en vez de esperar al
+# minuto y pico de macOS, y una descarga atascada (menos de 1 KB/s durante un minuto) se corta y se reintenta.
 descargar_verificado() {
     local url="$1" destino="$2" esperado="$3" real
-    curl -fL --retry 2 -o "$destino" "$url" || return 1
+    curl -fL --retry 2 --connect-timeout 30 --speed-limit 1024 --speed-time 60 -o "$destino" "$url" || return 1
     real="$(shasum -a 256 "$destino" | awk '{ print $1 }')"
     if [ "$real" != "$esperado" ]; then echo "La huella SHA-256 de $(basename "$destino") no coincide: no se instala."; rm -f "$destino"; return 1; fi
 }
@@ -147,17 +149,29 @@ instalar_node() {
     asegurar_entorno
 }
 
+# ffmpeg y ffprobe de un mismo origen a la carpeta $1: url y huella de ffmpeg ($2, $3) y de ffprobe ($4, $5).
+bajar_ffmpeg_y_ffprobe() {
+    descargar_verificado "$2" "$1/ffmpeg.zip" "$3" && descargar_verificado "$4" "$1/ffprobe.zip" "$5"
+}
+
 # ffmpeg y ffprobe 9.0.2 estáticos (con libx264 y zscale) de ffmpeg.martin-riedl.de; descargados con curl,
-# que no les pone la marca de cuarentena, así que macOS no los bloquea.
+# que no les pone la marca de cuarentena, así que macOS no los bloquea. Ese servidor va detrás de Cloudflare y
+# hay redes que no llegan a él (en España, las operadoras cortan IPs de Cloudflare en días de fútbol): en Intel
+# se prueba entonces evermeet.cx, con el mismo ffmpeg 9.0.2 y su huella fijada.
 instalar_ffmpeg() {
-    local arq url sha_ffmpeg sha_ffprobe tmp
+    local arq tmp
     arq="$(arquitectura)"
-    if [ "$arq" = "arm64" ]; then url="$URL_FFMPEG_ARM64"; sha_ffmpeg="$SHA256_FFMPEG_ARM64"; sha_ffprobe="$SHA256_FFPROBE_ARM64"
-    else url="$URL_FFMPEG_X86_64"; sha_ffmpeg="$SHA256_FFMPEG_X86_64"; sha_ffprobe="$SHA256_FFPROBE_X86_64"; fi
     tmp="$(mktemp -d)"
     echo "Descargando ffmpeg 9.0.2 completo (unos 60 MB)..."
-    descargar_verificado "$url/ffmpeg.zip" "$tmp/ffmpeg.zip" "$sha_ffmpeg" || { rm -rf "$tmp"; return 1; }
-    descargar_verificado "$url/ffprobe.zip" "$tmp/ffprobe.zip" "$sha_ffprobe" || { rm -rf "$tmp"; return 1; }
+    if [ "$arq" = "arm64" ]; then
+        bajar_ffmpeg_y_ffprobe "$tmp" "$URL_FFMPEG_ARM64/ffmpeg.zip" "$SHA256_FFMPEG_ARM64" "$URL_FFMPEG_ARM64/ffprobe.zip" "$SHA256_FFPROBE_ARM64"
+    else
+        bajar_ffmpeg_y_ffprobe "$tmp" "$URL_FFMPEG_X86_64/ffmpeg.zip" "$SHA256_FFMPEG_X86_64" "$URL_FFMPEG_X86_64/ffprobe.zip" "$SHA256_FFPROBE_X86_64" || {
+            echo "No llego a ffmpeg.martin-riedl.de: lo bajo de evermeet.cx (el mismo ffmpeg 9.0.2 para Intel)."
+            rm -f "$tmp/ffmpeg.zip" "$tmp/ffprobe.zip"
+            bajar_ffmpeg_y_ffprobe "$tmp" "$URL_FFMPEG_X86_64_RESERVA" "$SHA256_FFMPEG_X86_64_RESERVA" "$URL_FFPROBE_X86_64_RESERVA" "$SHA256_FFPROBE_X86_64_RESERVA"
+        }
+    fi || { rm -rf "$tmp"; return 1; }
     mkdir -p "$DRAZO_FFMPEG"
     ditto -x -k "$tmp/ffmpeg.zip" "$DRAZO_FFMPEG" && ditto -x -k "$tmp/ffprobe.zip" "$DRAZO_FFMPEG"
     chmod +x "$DRAZO_FFMPEG/ffmpeg" "$DRAZO_FFMPEG/ffprobe"
@@ -179,8 +193,13 @@ instalar_python() {
     asegurar_entorno
 }
 
+# En Mac con Intel solo se instalan ruedas: desde numba 0.63, llvmlite 0.46 y (en macOS 13) opencv 4.12 ya no las
+# publican para x86_64, y sin rueda uv intenta compilarlos, pide CMake y el entorno se queda sin paquetes. Con
+# --no-build (en pip, --only-binary) se queda con la última versión de cada uno que tenga rueda para Intel.
 instalar_venv() {
-    local uv; uv="$(command -v uv 2>/dev/null)"
+    local uv sin_compilar_uv="" sin_compilar_pip=""
+    uv="$(command -v uv 2>/dev/null)"
+    if [ "$(arquitectura)" = "x86_64" ]; then sin_compilar_uv="--no-build"; sin_compilar_pip="--only-binary=:all:"; fi
     mkdir -p "$DRAZO_DATOS"
     if [ -n "$uv" ]; then
         export UV_PYTHON_INSTALL_DIR="$DRAZO_DATOS/python" UV_CACHE_DIR="$DRAZO_DATOS/uv-cache"
@@ -189,14 +208,14 @@ instalar_venv() {
             "$uv" venv --clear --seed --python 3.12 "$DRAZO_VENV" || return 1
         fi
         echo "Instalando los paquetes de Python de Drazo (tarda unos minutos)..."
-        "$uv" pip install --python "$DRAZO_PYTHON" -r "$REQUISITOS_PYTHON"
+        "$uv" pip install --python "$DRAZO_PYTHON" ${sin_compilar_uv:+"$sin_compilar_uv"} -r "$REQUISITOS_PYTHON"
         return
     fi
     buscar_python_base
     if [ -z "$PY_BASE_EXE" ]; then echo "Falta uv (paso python)."; return 1; fi
     if [ ! -x "$DRAZO_PYTHON" ] || ! "$DRAZO_PYTHON" -c 'import sys' >/dev/null 2>&1; then "$PY_BASE_EXE" -m venv --clear "$DRAZO_VENV" || return 1; fi
     "$DRAZO_PYTHON" -m pip install --disable-pip-version-check --upgrade pip
-    "$DRAZO_PYTHON" -m pip install --disable-pip-version-check -r "$REQUISITOS_PYTHON"
+    "$DRAZO_PYTHON" -m pip install --disable-pip-version-check ${sin_compilar_pip:+"$sin_compilar_pip"} -r "$REQUISITOS_PYTHON"
 }
 
 instalar_modelo() {
